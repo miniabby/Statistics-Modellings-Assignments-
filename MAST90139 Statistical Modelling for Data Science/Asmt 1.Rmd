@@ -1,0 +1,73 @@
+---
+title: "MAST90139 Assignment 1"
+author: "Kechen Zhao 957398"
+date: "29/03/2021"
+output: word_document
+---
+
+Part 1
+```{r}
+library(readr)
+domviolence <- read_csv("domviolence.csv")
+
+# Factor each categorical variable
+domviolence$reg=factor(domviolence$reg)
+domviolence$age=factor(domviolence$age)
+domviolence$ms=factor(domviolence$ms)
+domviolence$mmo=factor(domviolence$mmo)
+domviolence$smok=factor(domviolence$smok)
+domviolence$alc=factor(domviolence$alc)
+domviolence$falc=factor(domviolence$falc)
+domviolence$educ=factor(domviolence$educ)
+domviolence$dv=factor(domviolence$dv)
+```
+a. Fit a general model which contains all variables
+```{r}
+model0 <- glm(dv ~ age + ms + mmo + smok + alc + falc + educ + reg, family = binomial, domviolence)
+summary(model0)
+```
+Use anova command to test the significance of predictors
+```{r}
+anova(model0, test="Chi")
+```
+Based on the result, we can see that predictor alc is not significant so we will drop this variable.
+```{r}
+model1 <- glm(dv ~ age + ms + mmo + smok + falc + educ + reg, family = binomial, domviolence)
+summary(model1)
+```
+b. Test models' goodness of fit
+```{r}
+# Change age and educ as continuous variables
+domviolence$age=as.integer(domviolence$age)
+domviolence$educ=as.integer(domviolence$educ)
+model2 <- glm(dv ~ age + ms + mmo + smok + falc + educ + reg, family = binomial, domviolence)
+summary(model2)
+```
+Compare model2 with model1 in terms of goodness of fit using deviance: 
+```{r}
+anova(model1, model2, test='Chi')
+```
+We can see p-value is larger than 0.05, so two models are not significantly differ, we will choose model2 since it's simpler.
+
+c. Final model construction
+```{r}
+# model containing all first-order interaction terms
+model3 <- glm(dv ~ age + ms + mmo + smok + falc + educ + reg + (age + ms + mmo + smok + falc + educ + reg)^2, family = binomial, domviolence)
+summary(model3)
+```
+
+Use step command to select the stepwise best model:
+```{r}
+model4 <- step(model3, trace = FALSE)
+summary(model4)
+```
+Use anova to further drop any insignificant predictors"
+```{r}
+anova(model4, test='Chi')
+```
+We will drop predictors in smok:falc and educ:reg.
+```{r}
+bestmodel <- glm(formula = dv ~ age + ms + smok + falc + educ + reg + ms:falc, family = binomial, data = domviolence)
+summary(bestmodel)
+```
+

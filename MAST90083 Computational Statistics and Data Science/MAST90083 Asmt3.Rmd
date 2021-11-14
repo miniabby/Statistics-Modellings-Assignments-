@@ -1,0 +1,201 @@
+---
+title: "MAST90083 Asmt3"
+author: "Kechen Zhao 957398"
+date: "20/10/2021"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r}
+library(e1071)
+library(ggplot2)
+```
+
+1. Generate random dataset
+```{r}
+set.seed(50)
+C = 3
+N = 300
+x.o <- matrix(rnorm(N*2), ncol=2)
+```
+Define class specific means:
+```{r}
+z <- matrix(c(0,0,3,0,3,0),C,2)
+```
+Generate response vector y:
+```{r}
+y.1 <- matrix(1,100,1)
+y.2 <- matrix(2,100,1)
+y.3 <- matrix(3,100,1)
+
+y <- rbind(y.1, y.2, y.3)
+```
+Distribution of first class: N(t(0,0),I)
+Distribution of second class: N(t(0,3),I)
+Distribution of third class: N(t(3,0),I)
+```{r}
+x <- matrix(0,N,2)
+px <- pnorm(x.o)
+for (i in 1:N) {
+  if (i <= 100) {
+    p.1 <- px[i,1]
+    p.2 <- px[i,2]
+    
+    x[i,1] <- qnorm(p.1, z[1,1])
+    x[i,2] <- qnorm(p.2, z[1,2])
+  }
+  if ((i > 100) & (i <= 200)) {
+    p.1 <- px[i,1]
+    p.2 <- px[i,2]
+    
+    x[i,1] <- qnorm(p.1, z[2,1])
+    x[i,2] <- qnorm(p.2, z[2,2])
+  }
+  if ((i > 200) & (i <= 300)) {
+    p.1 <- px[i,1]
+    p.2 <- px[i,2]
+    
+    x[i,1] <- qnorm(p.1, z[3,1])
+    x[i,2] <- qnorm(p.2, z[3,2])
+  }
+}
+```
+
+
+```{r}
+xmin <- min(x[,1])
+xmax <- max(x[,1])
+ymin <- min(x[,2])
+ymax <- max(x[,2])
+
+x.data <- data.frame(x)
+ggplot(x.data, aes(x = x.data[,1], y = x.data[,2]), xlab = "x1", ylab = "x2"
+       ) + geom_point(aes(colour = as.factor(y))) + labs(x = "x1", y = "x2")
+```
+
+
+2. Construct training set and fit svm:
+```{r}
+tdata=data.frame(x = x, y=as.factor(y))
+svmfit <- svm(y~., data = tdata, cost = 10, kernel = "linear")
+plot(svmfit, tdata)
+```
+```{r}
+summary(svmfit)
+```
+Total 67 support vectors, class one has 31, class two has 19 and class three has 17. 
+
+3. Perform ten-fold cross-validation:
+```{r}
+set.seed(50)
+tuned <- tune(svm,y~.,data=tdata ,kernel ="linear", 
+              ranges=list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+```
+```{r}
+summary(tuned)
+```
+From the above summary, we can see that when cost = 1, error is the smallest. 
+```{r}
+bestmod=tuned$best.model
+summary(bestmod)
+```
+Number of support vectors changed: total 81 support vectors, class one has 37, class two has 22 and class three has 22. 
+
+4.
+```{r}
+set.seed(100)
+x.o.test <- matrix(rnorm(N*2), ncol=2)
+```
+```{r}
+set.seed(100)
+ytest <- sample(c(1:3), 300, replace = TRUE)
+testdata.o=data.frame(x=x.o.test , y=as.factor (ytest))
+```
+```{r}
+xtest <- matrix(0,N,2)
+px <- pnorm(x.o.test)
+for (i in 1:N) {
+  if (testdata.o[i,3] == 1) {
+    p.1 <- px[i,1]
+    p.2 <- px[i,2]
+    
+    xtest[i,1] <- qnorm(p.1, z[1,1])
+    xtest[i,2] <- qnorm(p.2, z[1,2])
+  }
+  if (testdata.o[i,3] == 2) {
+    p.1 <- px[i,1]
+    p.2 <- px[i,2]
+    
+    xtest[i,1] <- qnorm(p.1, z[2,1])
+    xtest[i,2] <- qnorm(p.2, z[2,2])
+  }
+  if (testdata.o[i,3] == 3) {
+    p.1 <- px[i,1]
+    p.2 <- px[i,2]
+    
+    xtest[i,1] <- qnorm(p.1, z[3,1])
+    xtest[i,2] <- qnorm(p.2, z[3,2])
+  }
+}
+```
+```{r}
+testdata=data.frame(x=xtest , y=as.factor (ytest))
+```
+
+```{r}
+set.seed(100)
+y.p <- predict(bestmod, testdata)
+sum(table(y.p, ytest)) - table(y.p, ytest)[1,1] - table(y.p, ytest)[2,2] - table(y.p, ytest)[3,3]
+table(y.p, ytest)
+```
+27 classifications made. 
+```{r}
+table(ytest)
+```
+The reason why in class 3 there are 109 correct classifications is because due to the random labelling of y, total number of points in class 3 is 114 which is larger than 100, therefore it's reasonable more than 100 correct classifications are made for class 3. 
+
+5. Repeat the above procedure for radial kernel:
+```{r}
+svmfit.ra <- svm(y~., data = tdata, cost = 1, gamma = 1, kernel = "radial")
+plot(svmfit.ra, tdata)
+```
+```{r}
+summary(svmfit.ra)
+```
+Perform ten-fold cross-validation:
+```{r}
+set.seed(50)
+tuned.ra <- tune(svm, y~., data = tdata, kernel = "radial",
+                 ranges = list(cost = c(0.1,1,10,100,1000), gamma = c(0.5,1,2,3,4)))
+```
+```{r}
+summary(tuned.ra)
+```
+From the above summary, we can see that when cost = 100 and gamma = 2, error is the smallest. 
+```{r}
+bestmod.ra <- svm(y~., data = tdata, cost = 100, gamma = 2, kernel = "radial")
+summary(bestmod.ra)
+```
+```{r}
+y.p <- predict(bestmod.ra, testdata)
+sum(table(y.p, ytest)) - table(y.p, ytest)[1,1] - table(y.p, ytest)[2,2] - table(y.p, ytest)[3,3]
+table(y.p, ytest)
+```
+36 classifications made, which is more than the one performed by using linear kernel. So the result implies that data is linear separable and we don't need to use the radial kernel. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

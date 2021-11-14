@@ -1,0 +1,177 @@
+---
+title: "MAST90138 Asmt1"
+author: "Kechen Zhao 957398"
+date: "15/08/2021"
+output: word_document
+---
+
+Problem 1
+
+a. To make $$ \Sigma $$ to be the covariance matrix, it needs to be symmetric and positive semi-definite
+$$ \Sigma  = \begin{bmatrix} 1&2 \\ a&b \\ \end{bmatrix}$$
+To make it to be symmetric, let a = 2, then find the value of b to make the matrix positive semi-definite (can check whether it is positive semi-definite or not by checking whether if all its eigenvalues are non-negative):
+Let A = $$ \Sigma $$, then the eigenvalue problem becomes $$ A*v = \lambda*v => A*v - \lambda*v = 0 => (A-\lambda * I)*v = 0$$
+If all eigenvectors v are non-zero, then the solution will be given by $$ A-\lambda * I  = 0 $$
+In matrix form, $$ |A-\lambda * I| = |\begin{bmatrix} 1&2 \\ 2&b \\ \end{bmatrix} - \begin{bmatrix} \lambda&0 \\ 0&\lambda \\ \end{bmatrix}| = |\begin{bmatrix} 1-\lambda&2 \\ 2&b-\lambda \\ \end{bmatrix}| = 0$$
+$$ \lambda^2-(b+1)\lambda+(b-4) = 0$$
+We will then find the value of b which makes all solutions of lambda non-negative:
+Case 1. lambda = 0, then $$ 0-(b+1)*0 + b-4 = 0 => b = 4$$, the $$ \Sigma  = \begin{bmatrix} 1&2 \\ 2&4 \\ \end{bmatrix}$$, calculate its eigenvalues to check positive semi-definite:
+```{r}
+sigma = matrix(c(1,2,2,4), ncol=2, nrow=2)
+EE = eigen(sigma)
+Evalues = EE$values
+Evalues
+```
+Eigenvalues = 5 and 0 which are all non-negative, so b=4 meets the requirement.
+Case 2. lambda > 0, then based on the characteristic of quadratic equation, roots are real and positive if and only if $$b+1 > 0$$, $$(b+1)^2-4*(b-4) > 0$$ and $$4*(b-4) >0$$. Combining the solutions of all conditions, lambda > 0 if and only if b > 4.
+Checking the roots when b > 4: 
+The solutions of $$ \lambda^2-(b+1)\lambda+(b-4) = 0$$ is $$ \lambda_1 = \frac{(b+1)-\sqrt{(b+1)^2-4*(b-4)}}{2},  \lambda_2 = \frac{(b+1)+\sqrt{(b+1)^2-4*(b-4)}}{2}$$ 
+By ploting the equation $$ (b+1)-\sqrt{(b+1)^2-4*(b-4)} $$, we can see its a monotoinc increasing funnction with value 0 when b = 4, which proves that values of lambda will always be real and positive if b > 4. 
+```{r}
+eq = function(b){(b+1)-sqrt((b+1)^2-4*(b-4))}
+plot(eq(1:100), type='l')
+```
+Thus, combining the results of both cases, values of lambda will be non-negative if and only if b >= 4, which makes the matrix sigma to be positive semi-definite. Therefore, sigma can be a covariate matrix when a = 2 and b >= 4. 
+
+b. $$ \Sigma  = \begin{bmatrix} 13&-4 \\ -4&7 \\ \end{bmatrix}$$, the eigenvalue problem is $$ \Sigma*v = \lambda*v => \Sigma*v - \lambda*v = 0 => (\Sigma-\lambda * I)*v = 0$$
+If all eigenvectors v are non-zero, then the solution will be given by $$ A-\lambda * I  = 0 $$
+In matrix form, $$ |\Sigma-\lambda * I| = |\begin{bmatrix} 13&-4 \\ -4&7 \\ \end{bmatrix} - \begin{bmatrix} \lambda&0 \\ 0&\lambda \\ \end{bmatrix}| = |\begin{bmatrix} 13-\lambda&-4\\ -4&7-\lambda \\ \end{bmatrix}| = 0$$
+This gives rise to the quadratic equationn $$ (13-\lambda)(7-\lambda)-16 = 0 => \lambda^2-20\lambda+75 = 0 => (\lambda-15)(\lambda-5) = 0 => \lambda_1 = 15, \lambda_2 = 5$$
+So eigenvalues of matrix sigma is 15 and 5, and their corresponding eigenvectors are:
+
+-for eigenvalue $$ \lambda_1 = 15 $$, the eigenvector can be calculated as $$ (\Sigma-15I)*v_1 = 0 => (\begin{bmatrix} 13&-4 \\ -4&7 \\ \end{bmatrix} - \begin{bmatrix} 15&0 \\ 0&15 \\ \end{bmatrix})*v_1 = \begin{bmatrix} -2&-4\\ -4&-8 \\ \end{bmatrix}* \begin{bmatrix} v_{11}\\ v_{12} \\ \end{bmatrix}= 0$$
+This gives $$ -2v_{11}-4v_{12} = 0, -4v_{11}-8v_{12} = 0$$, norm 1 gives another constraints $$ \sqrt{v_{11}^2+v_{12}^2} = 1$$, by solving system of equation we have $$ v_1 = \begin{bmatrix} -2\sqrt{\frac{1}{5}}\\ \sqrt{\frac{1}{5}} \\ \end{bmatrix} ,or, v_1 = \begin{bmatrix} 2\sqrt{\frac{1}{5}}\\ -\sqrt{\frac{1}{5}} \\ \end{bmatrix}$$
+
+-for eigenvalue $$ \lambda_1 = 5 $$, the eigenvector can be calculated as $$ (\Sigma-5I)*v_2 = 0 => (\begin{bmatrix} 13&-4 \\ -4&7 \\ \end{bmatrix} - \begin{bmatrix} 5&0 \\ 0&5 \\ \end{bmatrix})*v_1 = \begin{bmatrix} 8&-4\\ -4&2 \\ \end{bmatrix}* \begin{bmatrix} v_{21}\\ v_{22} \\ \end{bmatrix}= 0$$
+This gives $$ 8v_{21}-4v_{22} = 0, -4v_{21}+2v_{22} = 0$$, norm 1 gives another constraints $$ \sqrt{v_{21}^2+v_{22}^2} = 1$$, by solving system of equation we have $$ v_2 = \begin{bmatrix} \sqrt{\frac{1}{5}}\\ 2\sqrt{\frac{1}{5}} \\ \end{bmatrix} ,or, v_2 = \begin{bmatrix} -\sqrt{\frac{1}{5}}\\ -2\sqrt{\frac{1}{5}} \\ \end{bmatrix}$$
+
+So the eigenvector for $$ \lambda_1 = 15$$ is $$ v_1 = \begin{bmatrix} -2\sqrt{\frac{1}{5}}\\ \sqrt{\frac{1}{5}} \\ \end{bmatrix}$$, the eigenvector for $$ \lambda_2 = 5$$ is $$ v_2 = \begin{bmatrix} \sqrt{\frac{1}{5}}\\ 2\sqrt{\frac{1}{5}} \\ \end{bmatrix}$$
+
+Check by using R:
+```{r}
+sigma = matrix(c(13,-4,-4,7), ncol=2, nrow=2)
+EE = eigen(sigma)
+Evalues = EE$values
+Evalues
+Evec = EE$vectors
+Evec
+```
+$$\Gamma = \begin{bmatrix} -2\sqrt{\frac{1}{5}}&\sqrt{\frac{1}{5}} \\ \sqrt{\frac{1}{5}}&2\sqrt{\frac{1}{5}} \\ \end{bmatrix}, \Lambda = \begin{bmatrix} 15&0\\ 0&5 \\ \end{bmatrix}$$
+Check by using R:
+```{r}
+Gamma = matrix(c(-2*sqrt(1/5), sqrt(1/5), sqrt(1/5), 2*sqrt(1/5)), ncol=2, nrow=2)
+Lambda = matrix(c(15, 0, 0, 5), ncol=2, nrow=2)
+Gamma%*%Lambda%*%t(Gamma)
+```
+
+c. 
+```{r}
+X <- read.table("Wheat data.txt", sep = "")
+dim(X)
+wheat_variety <- X[, c(8)]
+wheat_variety 
+X <- X[, c(1,2,3,4,5,6,7)]
+(X <- as.matrix(X))
+```
+d. 
+```{r}
+CovX <- cov(X)
+EE <- eigen(CovX)
+Evalues <- EE$values
+Evec <- EE$vectors
+```
+So the orthogonal matrix $$ \Gamma$$ is equal to
+```{r}
+Gamma <- as.matrix(Evec)
+Gamma
+```
+and the diagonal matrix $$ \Lambda $$ is
+```{r}
+Lambda <- diag(Evalues)
+Lambda
+```
+Check by calculate the product of decomposition:
+```{r}
+Gamma%*%Lambda%*%t(Gamma)-CovX
+```
+
+
+
+
+Problem 2
+```{r}
+library(ICSNP)
+data(pulmonary)
+summary(pulmonary)
+head(pulmonary)
+```
+a. 
+```{r}
+plot(pulmonary)
+```
+b. 
+```{r}
+help(mahalanobis)
+sq_m_dist <- mahalanobis(pulmonary, center=colMeans(pulmonary), cov(pulmonary))
+sq_m_dist
+
+help(qqnorm)
+qqnorm(sq_m_dist)
+
+sq_m_dist_centered <- (sq_m_dist - mean(sq_m_dist))/sqrt(var(sq_m_dist))
+
+test_stat = c()
+for (i in 1:length(sq_m_dist_centered)) {
+  test_stat[i] <- 1-pchisq(sq_m_dist_centered[i], 3)
+}
+test_stat
+```
+Based on the Normal Q-Q Plot, the line formed by data points are roughly straight, which indicates that both sets of quantiles come from the same distribution, so data may come from a multivariate normal distribution. Moreover, based on the result of Chi-squared test, all test statistics of centralized data are larger than 0.05 which means that we can not reject the null hypothesis that data come from a multiivariate normal distribution at 95% significant level. 
+
+c. 
+```{r}
+help("HotellingsT2")
+HotellingsT2(pulmonary)
+```
+P-value given by the function HotellingsT2 is 0.05123.
+```{r}
+n = dim(pulmonary)[1]
+p = dim(pulmonary)[2]
+summary(pulmonary)
+S <- var(pulmonary)
+X_bar <- matrix(c(mean(pulmonary[,c(1)]), mean(pulmonary[,c(2)]), mean(pulmonary[,c(3)])))
+miu <- matrix(c(0,0,0)) #???
+test_statistic <- n*t(X_bar-miu)%*%solve(S)%*%(X_bar-miu)
+test_statistic
+```
+Based on Theorem 5.9, the connection between the Hotelling T2 and the F-distribution is $$ T^2(p,n) = \frac{np}{n-p+1}F_{p,n-p+1}$$
+So we can calculate the corresponding F test statistic:
+```{r}
+F_statistic <- test_statistic/((n-1)*p/((n-1)-p+1))
+F_statistic
+help(pf)
+1-pf(F_statistic, p, (n-1)-p+1)
+```
+We get the same p-value by using the connection between the Hotelling T2 and the F-distribution, both p-values are larger than 0.05 which indicate that we cannot reject the null hypothesis at 95% significant level.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,560 @@
+---
+title: "MAST90083 Asmt2"
+author: "Kechen Zhao 957398"
+date: "02/10/2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r}
+library(pracma)
+library(ggplot2)
+library(HRW)
+data(WarsawApts)
+```
+Question 1 Spline regression
+1. Construct matrices and 20 knots:
+```{r}
+x <- as.matrix(WarsawApts["construction.date"])
+y <- as.matrix(WarsawApts["areaPerMzloty"])
+n <- 409
+
+prob=seq(0,1,length = 22)
+k <- quantile(unique(x), probs = prob)[2:21]
+```
+2. Construct matrix containing linear spline basis functions:
+```{r}
+Z <- matrix(1, ncol = 1, nrow = n)
+for (i in 1:length(k)) {
+  Z <- cbind(Z, x-as.numeric(k[i]))
+}
+
+Z <- Z[,-1]
+Z[Z<0] <- 0
+```
+
+3. Construct matrix C:
+```{r}
+ones <- matrix(1, ncol=1, nrow=n)
+C <- cbind(ones, x, Z)
+```
+Generate matrix D:
+```{r}
+D <- diag(1, ncol=22, nrow=22)
+D[1,1] <- 0
+D[2,2] <- 0
+```
+Tuning parameter (penalization term):
+```{r}
+lambda <- seq(0,50,length=100)
+```
+4. Compute the RSS errors, degrees of freedom, and generalized cross validation (GCV) associated with 100 tuning parameters:
+```{r}
+# initialization
+beta_hat <- matrix(1, ncol = 1, nrow = 22)
+fitted_value <- matrix(1, ncol = 1, nrow = n)
+RSS <- c()
+df <- c()
+GCV <- c()
+
+for (i in 1:length(lambda)) {
+  beta_hat <- cbind(beta_hat,inv(t(C)%*%C+lambda[i]*D)%*%t(C)%*%y)
+  fitted_value <- cbind(fitted_value, C%*%(inv(t(C)%*%C+lambda[i]*D)%*%t(C)%*%y))
+  RSS <- c(RSS, sum((C%*%(inv(t(C)%*%C+lambda[i]*D)%*%t(C)%*%y)-y)^2))
+  S_lambda <- C%*%inv(t(C)%*%C+lambda[i]*D)%*%t(C)
+  df <- c(df, sum(diag(S_lambda)))
+  GCV <- c(GCV, RSS[i]/((1-df[i]/n)^2))
+}
+```
+5. The minimum GCV and the corresponding lambda:
+```{r}
+(mini=which(GCV==min(GCV)))
+(lambda[mini])
+```
+
+```{r}
+beta <- inv(t(C)%*%C+lambda[mini]*D)%*%t(C)%*%y
+y_fit <- C%*%beta
+
+year <- rep(x)
+origin <- rep(y)
+pred <- rep(y_fit)
+
+df <- data.frame(year = year, value1 = origin, pred = pred)
+
+ggplot(df) + 
+  geom_point(aes(x = year, y = value1, group = 1)) + 
+  geom_line(aes(x = year, y = pred, group = 1)) + ylab("y")
+
+```
+```{r}
+plot(x[order(x)], Z[,1][order(x)], ylim=c(-1,2), type='l', xlab="construction date (year)", ylab="linear spline basis")
+for(i in 2:20) {
+  lines(x[order(x)], Z[,i][order(x)], ylim=c(-1,2))
+}
+```
+The corresponding MSE for the selected lambda:
+```{r}
+(MSE = RSS[mini]/n)
+```
+
+For 60 basis (60 knots):
+```{r}
+prob=seq(0,1,length = 62)
+k <- quantile(unique(x), probs = prob)[2:61]
+
+Z <- matrix(1, ncol = 1, nrow = n)
+for (i in 1:length(k)) {
+  Z <- cbind(Z, x-as.numeric(k[i]))
+}
+
+Z <- Z[,-1]
+Z[Z<0] <- 0
+
+ones <- matrix(1, ncol=1, nrow=n)
+C <- cbind(ones, x, Z)
+```
+
+```{r}
+D <- diag(1, ncol=62, nrow=62)
+D[1,1] <- 0
+D[2,2] <- 0
+
+beta_hat <- matrix(1, ncol = 1, nrow = 62)
+fitted_value <- matrix(1, ncol = 1, nrow = n)
+RSS <- c()
+df <- c()
+GCV <- c()
+for (i in 1:length(lambda)) {
+  beta_hat <- cbind(beta_hat,inv(t(C)%*%C+lambda[i]*D)%*%t(C)%*%y)
+  fitted_value <- cbind(fitted_value, C%*%(inv(t(C)%*%C+lambda[i]*D)%*%t(C)%*%y))
+  RSS <- c(RSS, sum((C%*%(inv(t(C)%*%C+lambda[i]*D)%*%t(C)%*%y)-y)^2))
+  S_lambda <- C%*%inv(t(C)%*%C+lambda[i]*D)%*%t(C)
+  df <- c(df, sum(diag(S_lambda)))
+  GCV <- c(GCV, RSS[i]/((1-df[i]/n)^2))
+}
+```
+
+```{r}
+(mini=which(GCV==min(GCV)))
+(lambda[mini])
+RSS[mini]/n
+```
+Plot the basis:
+```{r}
+plot(x[order(x)], Z[,1][order(x)], ylim=c(-1,2), type='l', xlab="construction date (year)", ylab="linear spline basis")
+for(i in 2:60) {
+  lines(x[order(x)], Z[,i][order(x)], ylim=c(-1,2))
+}
+```
+
+
+```{r}
+beta <- inv(t(C)%*%C+lambda[mini]*D)%*%t(C)%*%y
+y_fit <- C%*%beta
+
+year <- rep(x)
+origin <- rep(y)
+pred <- rep(y_fit)
+
+df <- data.frame(year = year, value1 = origin, pred = pred)
+
+ggplot(df) + 
+  geom_point(aes(x = year, y = value1, group = 1)) + 
+  geom_line(aes(x = year, y = pred, group = 1)) + ylab("y")
+```
+```{r}
+(MSE = RSS[mini]/n)
+```
+MSE slightly worse than linear regression with 20 knots, but basically are the same. 
+
+Question 2 KNN Algorithm and different kernel functions
+1. KNN averaging:
+```{r}
+# select 6 values of k from 3 to 23
+k_knn <- seq(3,23,length=6)
+```
+
+```{r}
+# KNN function
+KNN <- function(xi, k, x, y) {
+  xi.matrix <- matrix(xi, nrow = dim(x)[1], ncol = 1)
+  di <- abs(xi.matrix-x)
+  indices <- order(di)[1:k] 
+  y_sum <- 0
+  for (i in 1:k) {
+    y_sum <- y_sum + as.numeric(y[indices[i],1])
+  }
+  y_pred <- y_sum/k
+  return (y_pred)
+}
+```
+
+2. Apply KNN:
+```{r}
+library(gridExtra)
+par(mfrow=c(3,2))
+MSE <- c()
+plot_list <- list()
+j = 0
+
+for (k in k_knn) {
+  y_hat_KNN <- matrix(0, ncol=1, nrow=n)
+  for (i in 1:n) {
+    y_hat_KNN[i,1] <- KNN(x[i,1], k, x, y)
+  }
+  
+  year <- rep(x)
+  origin <- rep(y)
+  pred <- rep(y_hat_KNN)
+
+  df <- data.frame(year = year, value1 = origin, pred = pred)
+  
+  j = j+1
+  plot_list[[j]] <- ggplot(df) + 
+    geom_point(aes(x = year, y = value1, group = 1)) + 
+    geom_line(aes(x = year, y = pred, group = 1)) +
+    labs(title = k)
+
+  MSE <- c(MSE,sum((y_hat_KNN-y)^2)/n)
+}
+MSE <- t(as.matrix(MSE))
+colnames(MSE) <- k_knn
+```
+```{r}
+library(patchwork)
+plot_list[[1]]+plot_list[[2]]+plot_list[[3]]+plot_list[[4]]+plot_list[[5]]+plot_list[[6]]+plot_layout(ncol = 2)
+```
+
+```{r}
+k.index=which(MSE==min(MSE))
+(selected.k <- k_knn[k.index])
+(min.MSE <- min(MSE))
+MSE
+```
+Among the randomly chosen k, k = 6 works the best, better than both linear spline regressions with 20 basis functions and 60 basis functions. 
+
+3. Implement a single function to accommodate all 6 kernels:
+```{r}
+## return a matrix of the entire x
+six.kernels.matrix <- function(x) {
+  
+  Epan <- matrix(0, ncol=1, nrow=n)
+  Gaus <- matrix(0, ncol=1, nrow=n)
+  Bi <- matrix(0, ncol=1, nrow=n)
+  Triw <- matrix(0, ncol=1, nrow=n)
+  Unif <- matrix(0, ncol=1, nrow=n)
+  Tric <- matrix(0, ncol=1, nrow=n)
+  
+  
+  for (i in 1:n) {
+    if (abs(x[i,1]) < 1) {
+      Epan[i,1] <- (3/4)*(1-(x[i,1])^2)
+      Bi[i,1] <- (15/16)*(1-(x[i,1])^2)^2
+      Triw[i,1] <- (35/32)*(1-(x[i,1])^2)^3
+      Unif[i,1] <- 1/2
+      Tric[i,1] <- (70/81)*(1-(abs(x[i,1]))^3)^3
+    } else {
+      Epan[i,1] <- 0
+      Bi[i,1] <- 0
+      Triw[i,1] <- 0
+      Unif[i,1] <- 0
+      Tric[i,1] <- 0
+    }
+    Gaus[i,1] <- (2*pi)^(-1/2)*exp(-(x[i,1])^2/2)
+  }
+  
+  kernel_matrix <- cbind(Epan, Gaus, Bi, Triw, Unif, Tric)
+  colnames(kernel_matrix) <- c('Epanechnikov', 'Gaussian', 'Biweight', 'Triweight', 'Uniform', 'Tricube')
+  
+  return (kernel_matrix)
+}
+```
+
+```{r}
+six.kernels <- function(xi) {
+
+  if (abs(xi) < 1) {
+    Epan <- (3/4)*(1-(xi)^2)
+    Bi <- (15/16)*(1-(xi)^2)^2
+    Triw <- (35/32)*(1-(xi)^2)^3
+    Unif <- 1/2
+    Tric <- (70/81)*(1-(abs(xi))^3)^3
+  } else {
+    Epan <- 0
+    Bi <- 0
+    Triw <- 0
+    Unif <- 0
+    Tric <- 0
+  }
+  Gaus <- (2*pi)^(-1/2)*exp(-(xi)^2/2)
+  
+  return (c(Epan, Gaus, Bi, Triw, Unif, Tric))
+}
+```
+```{r}
+six.kernels(0.5)
+```
+
+4. Make predictions using formula and bandwidth fixed at h = 2:
+```{r}
+h = 2
+f_fit <- matrix(0,ncol=6, nrow=n)
+for (i in 1:n) {
+  xi <- x[i,1]
+  Kh.sum <- 0
+  Kh.yi <- 0
+  for (j in 1:n) {
+    xj <- x[j,1]
+    Kh.yi <- Kh.yi + six.kernels((xj-xi)/h)*y[j,1]
+    Kh.sum <- Kh.sum + six.kernels((xj-xi)/h)
+  }
+  f_fit[i,] <- as.matrix(Kh.yi/Kh.sum)
+}
+```
+
+```{r}
+kernel <- c('Epanechnikov', 'Gaussian', 'Biweight', 'Triweight', 'Uniform', 'Tricube')
+kernel.MSE <- c()
+plot_list <- list()
+
+for (i in 1:6) {
+  
+  year <- rep(x)
+  origin <- rep(y)
+  pred <- rep(f_fit[,i])
+
+  df <- data.frame(year = year, value1 = origin, pred = pred)
+
+  plot_list[[i]] <- ggplot(df) + 
+    geom_point(aes(x = year, y = value1, group = 1)) + 
+    geom_line(aes(x = year, y = pred, group = 1)) +
+    labs(title = kernel[i])
+  
+  kernel.MSE <- c(kernel.MSE,sum((f_fit[,i]-y)^2)/n)
+}
+```
+```{r}
+plot_list[[1]]+plot_list[[2]]+plot_list[[3]]+plot_list[[4]]+plot_list[[5]]+plot_list[[6]]+plot_layout(ncol = 2)
+```
+
+```{r}
+kernel.MSE
+kernel.index=which(kernel.MSE==min(kernel.MSE))
+(selected.kernel <- kernel[kernel.index])
+(min.kernel.MSE <- min(kernel.MSE))
+```
+Triweight gives the best MSE. 
+
+Question 3 Estimation of distributions of density of a graph
+1. 
+```{r}
+library(plot.matrix)
+library(png)
+library(fields)
+I <- readPNG("/Users/abigail/Desktop/MAST90083/Assigments/Asmt2/CM.png")
+I = I[,,1]
+I =t(apply(I, 2, rev))
+par(mfrow=c(2,1))
+image(I, col=gray((0:255)/255))
+plot(density(I))
+```
+2. Implement EM algorithm to estimate parameters for 3 Gaussian Distributions of density:
+Assume observations Yi are independently observed from a three-component Gaussian distribution model which has the following pdf:
+$$g(y_i|\theta) = \frac{p_1}{\sigma_1\sqrt{2\pi}}e^{-\frac{1}{2}(\frac{y_i-\mu_1}{\sigma_1})^2}+\frac{p_2}{\sigma_2\sqrt{2\pi}}e^{-\frac{1}{2}(\frac{y_i-\mu_2}{\sigma_2})^2}+\frac{1-p_1-p_2}{\sigma_3\sqrt{2\pi}}e^{-\frac{1}{2}(\frac{y_i-\mu_3}{\sigma_3})^2}, i = 1,...,n, where \theta = (p_1, p_2, \mu_1, \mu_2, \mu_3, \sigma_1^2, \sigma_2^2, \sigma_3^2)$$ are known parameters with 0 <= p1 <= 1, 0 <= p2 <= 1 and all sigmas > 0. To use EM algorithm to estimate the MLE of theta, we introduce an unobserved indicator variable Zi for each i = 1,...,n, with P(Zi=1) = p1, P(Zi=2) = p2 and P(Zi=3) = 1-p1-p2. Then we know the conditional pdf of Yi given Zi is $$(Y_i|Z_i=1)\sim N(\mu_1, \sigma_1^2), (Y_i|Z_i=2)\sim N(\mu_2, \sigma_2^2), (Y_i|Z_i=3)\sim N(\mu_3, \sigma_3^2)$$.
+### HAND WRITTEN STEPS FOR E-STEP AND M-STEP
+Implement the EM algorithm:
+```{r}
+EM.f <- function(y, theta0, stop.criteria) {
+  
+  # Structure of theta0 (initial guess): c(p1, p2, miu1, miu2, miu3, sigma1^2, sigma2^2, sigma3^2)
+  
+  # Initialization (after each iteration need to record the difference between two estimations)
+  p.0 <- c(0,0)
+  miu.0 <- c(0,0,0)
+  sigma.0 <- c(0,0,0)
+  
+  p.prev <- c()
+  miu.prev <- c()
+  sigma.prev <- c()
+  
+  p.new <- c(theta0[1], theta0[2])
+  miu.new <- c(theta0[3], theta0[4], theta0[5])
+  sigma.new <- c(theta0[6], theta0[7], theta0[8])
+  
+  
+  n <- length(y)
+  iter <- 0
+  
+  while (stop.criteria(miu.0, miu.prev, miu.new, sigma.0, sigma.prev, sigma.new) > 1e-06){
+    
+    iter <- iter + 1
+    
+    # Calculate the posterior of latent variables
+    post.z <- z.posterior(y, p.new, miu.new, sigma.new)
+    post.z1 <- t(as.matrix(post.z[1:n]))
+    post.z2 <- t(as.matrix(post.z[(n+1):(2*n)]))
+    post.z3 <- t(as.matrix(post.z[(2*n+1):(3*n)]))
+    
+    # Calculate the new value of parameters based on formula derived above
+    p1 <- sum(post.z1)/n
+    p2 <- sum(post.z2)/n
+    p3 <- 1-p1-p2
+    
+    miu1 <- as.numeric((post.z1%*%y)/sum(post.z1))
+    miu2 <- as.numeric((post.z2%*%y)/sum(post.z2))
+    miu3 <- as.numeric((post.z3%*%y)/sum(post.z3))
+    
+    sigma1 <- (post.z1%*%(y-miu1)^2)/sum(post.z1)
+    sigma2 <- (post.z2%*%(y-miu2)^2)/sum(post.z2)
+    sigma3 <- (post.z3%*%(y-miu3)^2)/sum(post.z3)
+    
+    # update the initialization
+    if (iter == 1 || iter == 2) {
+      p.prev <- p.new
+      miu.prev <- miu.new
+      sigma.prev <- sigma.new
+      
+      p.new <- c(p1, p2)
+      miu.new <- c(miu1, miu2, miu3)
+      sigma.new <- c(sigma1, sigma2, sigma3)
+    } else {
+      p.0 <- p.prev
+      miu.0 <- miu.prev
+      sigma.0 <- sigma.prev
+      
+      p.prev <- p.new
+      miu.prev <- miu.new
+      sigma.prev <- sigma.new
+      
+      p.new <- c(p1, p2)
+      miu.new <- c(miu1, miu2, miu3)
+      sigma.new <- c(sigma1, sigma2, sigma3)
+    }
+    # print(round(c(miu1,miu2,miu3,sqrt(sigma1),sqrt(sigma2),sqrt(sigma3),p1,p2,1-p1-p2),4))
+  }
+  
+  return (c(miu1,miu2,miu3,sqrt(sigma1),sqrt(sigma2),sqrt(sigma3),p1,p2,1-p1-p2))
+}
+```
+
+```{r}
+z.posterior <- function(y, p, miu, sigma) {
+  
+  p1.0 <- p[1]
+  p2.0 <- p[2]
+  miu1.0 <- miu[1]
+  miu2.0 <- miu[2]
+  miu3.0 <- miu[3]
+  sigma1.0 <- sigma[1]
+  sigma2.0 <- sigma[2]
+  sigma3.0 <- sigma[3]
+  
+  denominator <- p1.0*(1/sqrt(sigma1.0*2*pi))*exp((-1/2)*((y-miu1.0)^2/sigma1.0)) +
+    p2.0*(1/sqrt(sigma2.0*2*pi))*exp((-1/2)*((y-miu2.0)^2/sigma2.0)) +
+    (1-p1.0-p2.0)*(1/sqrt(sigma3.0*2*pi))*exp((-1/2)*((y-miu3.0)^2/sigma3.0))
+  
+  p.z1 <- (p1.0*(1/sqrt(sigma1.0*2*pi))*exp((-1/2)*((y-miu1.0)^2/sigma1.0)))/denominator
+  p.z2 <- (p2.0*(1/sqrt(sigma2.0*2*pi))*exp((-1/2)*((y-miu2.0)^2/sigma2.0)))/denominator
+  p.z3 <- 1-p.z1-p.z2
+  
+  return (c(p.z1, p.z2, p.z3))
+}
+```
+
+3. Implement the stopping criteria:
+```{r}
+stop.criteria <- function(miu.0, miu.1, miu.2, sigma.0, sigma.1, sigma.2){
+  if (length(miu.1) == 0 || length(miu.2) == 0) {
+    return(1)
+  } else {
+    ej_1 <- sum(miu.1-miu.0) + sum(sqrt(sigma.1)-sqrt(sigma.0))
+    ej <- sum(miu.2-miu.1) + sum(sqrt(sigma.2)-sqrt(sigma.1))
+    return (abs(ej-ej_1))
+  }
+}
+```
+
+4. Run EM algorithm:
+```{r}
+theta0 <- c(0.2, 0.3, 0.2, 0.24, 0.83, 0.5, 0.5, 0.5)
+param <- EM.f(as.vector(I), theta0, stop.criteria)
+```
+
+```{r}
+miu1 <- param[1]
+miu2 <- param[2]
+miu3 <- param[3]
+
+miu <- c(miu1, miu2, miu3)
+
+sigma1 <- param[4]
+sigma2 <- param[5]
+sigma3 <- param[6]
+
+sigma <- c(sigma1, sigma2, sigma3)
+
+p1 <- param[7]
+p2 <- param[8]
+p3 <- param[9]
+
+p <- c(p1, p2)
+
+n <- length(as.vector(I))
+```
+i. Calculate each pixel's pdf estimation:
+```{r}
+d <- dim(I)[1]
+pdf.est <- matrix(0, ncol=d, nrow=d)
+pix <- c(0,8,4)
+asg.colr <- matrix(0, ncol=d, nrow=d)
+
+for (i in 1:d) {
+  for (j in 1:d) {
+    point <- I[i,j]
+    pdf.est[i,j] <- p1*dnorm(point, mean = miu1, sd = sigma1) + p2*dnorm(point, mean = miu2, sd = sigma2) + p3*dnorm(point, mean = miu3, sd = sigma3)
+    mix.pdf <- c(p1*dnorm(point, mean = miu1, sd = sigma1), p2*dnorm(point, mean = miu2, sd = sigma2), p3*dnorm(point, mean = miu3, sd = sigma3))
+    index <- which(mix.pdf==max(mix.pdf))
+    asg.colr[i,j] <- pix[index]
+  }
+}
+```
+ii.Calculate the posterior pdfs multiplied with their mean:
+```{r}
+post.mean <- matrix(0, ncol=d, nrow=d)
+for (i in 1:d) {
+  for (j in 1:d) {
+    point <- I[i,j]
+    denominator <- p1*dnorm(point, mean = miu1, sd = sigma1) + p2*dnorm(point, mean = miu2, sd = sigma2) + p3*dnorm(point, mean = miu3, sd = sigma3)
+    post.mean[i,j] <- (miu1*p1*dnorm(point, mean = miu1, sd = sigma1)+miu2*p2*dnorm(point, mean = miu2, sd = sigma2)+miu3*p3*dnorm(point, mean = miu3, sd = sigma3))/denominator
+  }
+}
+```
+
+5. i.
+```{r}
+image.plot(asg.colr)
+```
+ii.
+```{r}
+image.plot(post.mean)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

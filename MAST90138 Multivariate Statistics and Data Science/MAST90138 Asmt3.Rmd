@@ -1,0 +1,343 @@
+---
+title: "MAST90138 Asmt3"
+author: "Kechen Zhao 957398"
+date: "22/09/2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+Problem 1
+```{r}
+library(MASS)
+library(pls)
+```
+
+```{r}
+XGtrain <- read.table(file = "XGtrainRain.txt", header = TRUE, sep = ",")
+XGtest <- read.table(file = "XGtestRain.txt", header = TRUE, sep = ",")
+```
+
+QDA:
+```{r}
+# QDA <- qda(G~.,data=XGtrain)
+# summary(QDA)
+```
+QDA model can't be fitted.
+
+Logistic Regression:
+```{r}
+LG <- glm(G~.,data=XGtrain,family=binomial(link = "logit"))
+summary(LG)
+```
+The algorithm does not converge. 
+
+We can see both QDA and logistic regression didn't work well on this dataset. For QDA, it gave a warning that some group is too small, while for logistic regression, the algorithm did not converge, and based on the summary of logistic regression, the given model seems to be overfitted: all the deviance residuals are zero. Also, according to the model coefficients, only 149 over 365 predictors were used. This may because in our training set, there are only 150 instances, while we have 365 explanatory variables, so p >> n. So under this condition, these two classifiers are not recommended to apply on this dataset. 
+
+b. PC components:
+```{r}
+Xtrain <- scale(XGtrain[,1:365], center=TRUE, scale=FALSE)
+PCX <- prcomp(Xtrain)
+gamma <- PCX$rotation
+```
+Recompute the PC components:
+```{r}
+n = nrow(Xtrain)
+X <- as.matrix(Xtrain)
+PCs <- (X-matrix(rep(1,n), nrow=n)%*%colMeans(X))%*%gamma
+all(PCs == PCX$x)
+```
+
+PLS components:
+```{r}
+PLS <- plsr(G~., data = XGtrain)
+phi <- PLS$projection
+```
+Recompute the PLS components:
+```{r}
+T.matrix <- Xtrain%*%phi
+all(T.matrix == PLS$scores)
+```
+Both PCs and PLS are calculated correctly. 
+
+c. Train QDA classifier with the PC components:
+```{r}
+G_train <- XGtrain[,366]
+n = dim(X)[1]
+CV=rep(0, 50)
+for(k in 1:50) {
+  pred_list = rep()
+  for(i in 1:n) {
+    DATACV = as.data.frame(PCs[-i,1:k])
+    G_train_CV = G_train[-i]
+    QDA <- qda(G_train_CV~.,data=DATACV)
+    
+    new <- as.data.frame(t(PCs[i,1:k]))
+    colnames(new) <- colnames(DATACV)
+    
+    pred <- as.numeric(predict(QDA, newdata = new)$class)-1
+    pred_list[i] = pred
+  } 
+  CV[k] = sum(pred_list != G_train)/n
+}
+```
+
+```{r}
+plot(rep(1:50), CV, type = 'line')
+```
+```{r}
+(qCV=which(CV==min(CV)))
+(min(CV))
+```
+By performing leave-one-out cross validation for PC components, the above numbers of PC components gives the best validation results 0.07333333. Therefore, we will choose the first 6 PCs for QDA classifier. 
+
+Train QDA classifier with the PLS components:
+```{r}
+G_train <- XGtrain[,366]
+n = dim(X)[1]
+CV=rep(0, 50)
+for(k in 1:50) {
+  pred_list = rep()
+  for(i in 1:n) {
+    DATACV = as.data.frame(T.matrix[-i,1:k])
+    G_train_CV = G_train[-i]
+    QDA <- qda(G_train_CV~.,data=DATACV)
+    
+    new <- as.data.frame(t(T.matrix[i,1:k]))
+    colnames(new) <- colnames(DATACV)
+    
+    pred <- as.numeric(predict(QDA, newdata = new)$class)-1
+    pred_list[i] = pred
+  } 
+  CV[k] = sum(pred_list != G_train)/n
+}
+```
+```{r}
+plot(rep(1:50), CV, type = 'line')
+```
+```{r}
+(qCV=which(CV==min(CV)))
+(min(CV))
+```
+By performing leave-one-out cross validation for PLS components, the above numbers of PLS components gives the best validation results 0. Therefore, we will choose the first 15 PLS components for QDA classifier. 
+
+Train logistic classifier with the PC components:
+```{r warning=FALSE}
+G_train <- XGtrain[,366]
+n = dim(X)[1]
+CV=rep(0, 50)
+for(k in 1:50) {
+  pred_list = rep()
+  for(i in 1:n) {
+    DATACV = as.data.frame(PCs[-i,1:k])
+    G_train_CV = G_train[-i]
+   
+    LG <- glm(G_train_CV~.,data=DATACV,family=binomial(link = "logit"))
+    
+    new <- as.data.frame(t(PCs[i,1:k]))
+    colnames(new) <- colnames(DATACV)
+    
+    if (predict(LG, newdata = new) > 0) {
+      pred = 1
+    } else {
+      pred = 0
+    }
+    pred_list[i] = pred
+  } 
+  CV[k] = sum(pred_list != G_train)/n
+}
+```
+
+```{r}
+plot(rep(1:50), CV, type = 'line')
+```
+```{r}
+(qCV=which(CV==min(CV)))
+(min(CV))
+```
+For the logistic classifier, the number of PC components we should pick up is 4, which has the minimum CV error = 0.03333333. 
+
+Train logistic classifier with the PLS components:
+```{r warning=FALSE}
+G_train <- XGtrain[,366]
+n = dim(X)[1]
+CV=rep(0, 50)
+for(k in 1:50) {
+  pred_list = rep()
+  for(i in 1:n) {
+    DATACV = as.data.frame(T.matrix[-i,1:k])
+    G_train_CV = G_train[-i]
+   
+    LG <- glm(G_train_CV~.,data=DATACV,family=binomial(link = "logit"))
+    
+    new <- as.data.frame(t(T.matrix[i,1:k]))
+    colnames(new) <- colnames(DATACV)
+    
+    if (predict(LG, newdata = new) > 0) {
+      pred = 1
+    } else {
+      pred = 0
+    }
+    pred_list[i] = pred
+  } 
+  CV[k] = sum(pred_list != G_train)/n
+}
+```
+
+```{r}
+plot(rep(1:50), CV, type = 'line')
+```
+
+```{r}
+(qCV=which(CV==min(CV)))
+(min(CV))
+```
+For the logistic classifier, the number of PLS components we should pick up is 14, which has the minimum CV error = 0. 
+
+d. Based on the results from part c, the best numbers of PLS components gave the LOOCV error = 0, which are lower than that of PC components for both QDA and logistic regression. Therefore, PLS is prefered for both QDA and logistic regression. 
+
+e. For QDA with 6 PC components:
+```{r}
+Xtest <- as.matrix(sweep(XGtest[,1:365], 2, colMeans(XGtrain[,1:365])))
+Gtest <- XGtest[, 366]
+PCX <- Xtest%*%gamma
+
+PC6s.test <- as.data.frame(PCX[, 1:6])
+
+PC6s.train <- as.data.frame(PCs[,1:6])
+QDA_PC6s <- qda(G_train~.,data=PC6s.train)
+
+# QDA_PC6s <- qda(Gtest~.,data=PC6s.test)
+pred <- predict(QDA_PC6s, newdata = PC6s.test)$class
+
+table(pred, Gtest)
+
+(QDA.PC.error <- sum(pred !=Gtest)/41)
+```
+The test error is 0.09756098.
+
+For QDA with 15 PLS components:
+```{r}
+# PLS <- plsr(G~., data = XGtest)
+# phi <- PLS$projection
+PLS15.test <- as.data.frame((Xtest%*%phi)[, 1:15])
+
+PLS15.train <- as.data.frame(T.matrix[,1:15])
+QDA_PLS15 <- qda(G_train~.,data=PLS15.train)
+
+pred <- predict(QDA_PLS15, newdata = PLS15.test)$class
+
+table(pred, Gtest)
+
+(QDA.PLS.error <- sum(pred !=Gtest)/41)
+```
+The test error is 0.09756098.
+
+For logistic classifier with 4 PC components:
+```{r warning=FALSE}
+PC6s.test <- as.data.frame(PCX[, 1:4])
+
+PC6s.train <- as.data.frame(PCs[,1:4])
+LG_PC6s <- glm(G_train~.,data=PC6s.train,family=binomial(link = "logit"))
+
+Decision <- predict(LG_PC6s, newdata = PC6s.test)
+pred[Decision<0]=0
+pred[Decision>0]=1
+
+table(pred, Gtest)
+
+(LG.PC.error <- sum(pred !=Gtest)/41)
+```
+The test error is 0.02439024.
+
+For logistic classifier with 14 PLS components:
+```{r warning=FALSE}
+PLS <- plsr(G~., data = XGtest)
+PLS14.test <- as.data.frame((Xtest%*%phi)[, 1:14])
+
+PLS14.train <- as.data.frame(T.matrix[,1:14])
+
+PLS14 <- glm(G_train~.,data=PLS14.train,family=binomial(link = "logit"))
+
+Decision <- predict(PLS14, newdata = PLS14.test)
+pred[Decision<0]=0
+pred[Decision>0]=1
+
+table(pred, Gtest)
+
+(LG.PLS.error <- sum(pred !=Gtest)/41)
+```
+The test error is 0.1219512.
+
+For QDA and logistic classifier, PC components generally work better than PLS components. 
+
+Problem 2.
+a. Train a random forest classifier:
+```{r}
+library(randomForest)
+m.rf <- randomForest(formula=factor(G) ~. , data=XGtrain, ntree=3000, importance = TRUE)
+
+OOB.error <- m.rf$err.rate[,1]
+plot(OOB.error, type = "l")
+abline(h = mean(OOB.error), col = 'blue', xlab = "number of trees used", lty = 2)
+title("OOB error against the number of trees used")
+legend("topright", c('OOB.Error','Mean'), col=c('black','4'),lty=c(1,2),inset=.01)
+```
+We will take the B where the OOB error curve stabilizes:
+```{r}
+(B=which(OOB.error==OOB.error[3000]))
+```
+Choose B = 220.
+```{r}
+B = 220
+m.rf <- randomForest(formula=factor(G) ~. , data=XGtrain, ntree=B, importance = TRUE)
+```
+
+b. 
+```{r}
+varImpPlot(m.rf)
+```
+```{r}
+m.rf$importance[order(m.rf$importance[,3], decreasing = TRUE)[1:30], 3:4]
+```
+We can see that for the top 30 important Xj variables for the rainfall data, most of them are represent the days in Summer in Australia, which may indicate that the difference of rainfall between north and south of Australia are the most significant in summer. This may be caused by the large climate difference between north and south of Australia in summer.
+
+c. Apply the classifier to the test dataset:
+```{r}
+ClassPred=predict(m.rf,newdata=XGtest[,1:365])
+(rf.error <- sum(ClassPred != XGtest$G)/41)
+```
+The classification error for trained rm classifier is 0.04878049.
+
+Train the RF multiple times and do prediction:
+```{r}
+error.list <- c()
+for (i in 1:20) {
+  rm <- randomForest(formula=factor(G) ~. , data=XGtrain, ntree=B)
+  ClassPred=predict(rm,newdata=XGtest[,1:365])
+  test.error <- sum(ClassPred != XGtest$G)/41
+  error.list <- c(error.list, test.error)
+}
+error.list
+```
+We can see that the classification errors are not always the same. This is because when constructing the random forest, randomness was introduced each time so the classifiers will be different: first, by using the bootstrap method to generate samples, randomness occurred so each time we would get different samples; secondly, when training the classifier, the candidate variables for each split were also randomly selected,which would lead to the different structures of the trees. Moreover, the smaller the number of candidate variables is, the higher the randomness will be. Therefore, it is reasonable that each time we trained the classifier, we got different classification errors. 
+
+To make the forest more stable, firstly we can choose large number of trees to reduce the randomness introduced by the bootstrap. Secondly, to decrease the randomness generated by random candidate variables for splits, we can choose large m so that we will have larger chance to select the most important for each split. Choosing large test set also can help stabilize the test errors by avoiding the fluctuation error rate caused by small data set. 
+
+Problem 3
+```{r}
+test.name <- c("QDA with PC", "QDA with PLS", "Logistic with PC", "Logistic with PLS", "Random Forest")
+error.value <- c(QDA.PC.error, QDA.PLS.error, LG.PC.error, LG.PLS.error, rf.error)
+error.matrix <- as.matrix(error.value)
+row.names(error.matrix) <- test.name
+error.matrix
+```
+From the above summary, we can see that Logistic classifier with PC components gives the most accurate prediction, with the classification error rate = 2.44%, which is followed by random forest, with the classification error rate = 7.32%. QDA with PC components and QDA with PLS components give the same accuracy with the classification error rate = 9.76%. Logistic classifier with PLS components gives the worst prediction, the classification error rate = 12.20%.
+
+The difference between predictions of classifiers can be explained by their underlying mechanisms. For both QDA with PC and PLS, the reason that they performed slightly worse is that QDA assumes data come from a Gaussian distribution with different covariance matrices, however in this data set it may not be the case. For logistic regression, PC components perform better than PLS components, this might because after data transformation done by PC components, the decision boundary of two classes may become linear, which allows logistic regression to give better performance. As for random forest, the slightly higher classification error may be the result of randomness when building the classifier, as discussed before. 
+
+
+
+
+
+

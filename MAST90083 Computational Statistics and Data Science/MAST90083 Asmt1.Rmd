@@ -1,0 +1,613 @@
+---
+title: "MAST90083 Asmt1"
+author: "Kechen Zhao 957398"
+date: "05/09/2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+Question 1
+```{r}
+library("MASS")
+library("ISLR")
+?Boston
+```
+
+1. Fit lm:
+```{r}
+medv.fit <- lm(medv~rm, data=Boston)
+```
+2. Plotting:
+```{r}
+plot(Boston$rm, Boston$medv)
+abline(medv.fit$coefficients[1], medv.fit$coefficients[2], col='red')
+```
+The line of fitted data gives an approximate linear trend of the Boston data. 
+
+3. Print the summary:
+```{r}
+summary(medv.fit)
+```
+R-squared measures the proportion of the variance for a dependent variable that's explained by an independent variable or variables in a regression model. To find any other variables in the dataset that can produce higher Multiple R-squared value, we need to find the variables that have higher correlation with the dependent variable medv:
+```{r}
+library(corrplot)
+corrplot(cor(Boston), method = 'number')
+```
+By using the correlation plot, we can see that variable lstat has higher correlation with medv than rm, so we will try to refit the linear model using lstat to see whether this predictor can increase the value of multiple R-squared:
+```{r}
+medv.fit.2 <- lm(medv~lstat, data=Boston)
+summary(medv.fit.2)
+```
+According to the summary, Multiple R-squared = 0.5441 which is higher than 0.4835, which corresponds to the result above. 
+
+4. Report the linear fitting:
+```{r}
+y.mfit <- lm(medv~., data=Boston)
+summary(y.mfit)
+```
+P-value in the summary indicates the significance of that variable in predicting the response. The four suggested variables will be selected which have the smallest p-values (the most significant): lstat, rm, dis, ptratio. 
+
+5. Plot the dataset:
+```{r}
+plot(Boston)
+```
+Chas will be the variable that has minimal effect on medv since in the plot age against medv there are nearly no trends and data just randomly located on the graph, and it's also the one that has literally no rule in prediction based on the graph. 
+Coefficients of the fit:
+```{r}
+coef(y.mfit)
+```
+We can see that although the coefficient of age is extremely small, the linear fit still include it in the model. 
+Looking back to the correlation plot, we can see that chas has the smallest correlation with medv, this may because chas is a categorical variable with only 2 classes. 
+
+Question 2
+
+1. Load the data
+```{r}
+data(Hitters)
+Hitters <- Hitters[!is.na(Hitters$Salary), ]
+```
+2. Matrix construction and fit ridge regression:
+```{r}
+x <- model.matrix(~.-1, data=subset(Hitters, select = -Salary))
+y <- model.matrix(~.-1, data=subset(Hitters, select = Salary))
+lambda <- 10^seq(10, -2, length = 100)
+library(glmnet)
+estimate <- glmnet(x, y, alpha=0, lambda=lambda)
+
+(lambda.max <- coef(estimate)[,1])
+(lambda.min <- coef(estimate)[,100])
+```
+Coefficient values of lambda = 10^10 are much more close to zero compare to that of lambda = 10^(-2). It's reasonable since large lambda will penalize the coefficients more. 
+
+3. 
+```{r}
+L2norm <- matrix(0, nrow = 1, ncol = 100)
+for (i in 1:100){
+  L2norm[,i] <- norm(estimate$beta[,i], type="2")
+}
+plot(log10(lambda),L2norm)
+```
+Compute MSE:
+```{r}
+prediction <- matrix(0, nrow = dim(y)[1], ncol=100)
+for (i in 1:dim(y)[1]){
+  for (j in 1:100){
+    prediction[i,j] <- sum(x[i,]*estimate$beta[,j])
+  }
+}
+
+mse <- matrix(0, nrow = 1, ncol=100)
+for (i in 1:100){
+  sse <- 0
+  for (j in 1:dim(y)[1]){
+    sse = sse + (y[j,1]-prediction[j,i])^2
+  }
+  mse[1,i] <- sse/dim(y)[1]
+}
+```
+
+```{r}
+plot(log10(lambda),mse)
+```
+We cannot decide which lambda will give us the best estimate only based on the L2 norm of the coefficients. However, MSE of each lambda can indicate how accurate the coefficients are in terms of estimating the salary. 
+
+4. Perform cross validation:
+```{r}
+set.seed(10)
+# generate the training set
+training.sample <- Hitters[sample(nrow(Hitters), 131),]
+training.x <- model.matrix(~.-1, data=subset(training.sample, select = -Salary))
+training.y <- model.matrix(~.-1, data=subset(training.sample, select = Salary))
+# generate the test set
+test.sample <- Hitters[!rownames(Hitters)%in%rownames(training.sample),]
+test.x <- model.matrix(~.-1, data=subset(test.sample, select = -Salary))
+test.y <- model.matrix(~.-1, data=subset(test.sample, select = Salary))
+```
+```{r}
+# perform cross validation on training set
+(training.cv.ridge <- cv.glmnet(training.x, training.y, type.measure = 'mse', alpha=0, lambda = lambda))
+plot(training.cv.ridge)
+```
+The best lambda = 305.4 with training MSE = 95669. Apply to the test set:
+```{r}
+predict.ridge <- predict.glmnet(object=training.cv.ridge$glmnet.fit, s=training.cv.ridge$lambda.min, newx=test.x)
+(test.MSE <- sum((predict.ridge-test.y)^2)/dim(test.sample)[1])
+```
+The test MSE under lambda = 305.4 is 143265.4.
+Refit the model:
+```{r}
+reprediction.ridge <- glmnet(x, y, alpha=0, lambda=training.cv.ridge$lambda.min)
+coef(reprediction.ridge)
+```
+Fit the data with linear regression:
+```{r}
+linear.fit <- lm(Salary~., data = Hitters)
+coef(linear.fit)
+```
+Coefficients in ridge regression are not similar to the linear regression case, since lambda is quite large, coefficients in ridge regression are closer to zero. However, ridge regression still includes all the variables, no matter they are significant or not. 
+
+5. Now fit the Lasso regression
+```{r}
+set.seed(10)
+(training.cv.lasso <- cv.glmnet(training.x, training.y, type.measure = 'mse', alpha=1, lambda = lambda))
+plot(training.cv.lasso)
+```
+The best lambda = 18.74 with training MSE = 95029. Apply to the test set:
+```{r}
+predict.lasso <- predict.glmnet(object=training.cv.lasso$glmnet.fit, s=training.cv.lasso$lambda.min, newx=test.x)
+(test.MSE <- sum((predict.lasso-test.y)^2)/dim(test.sample)[1])
+```
+The test MSE under lambda = 18.74 is 142270.1.
+Refit the model:
+```{r}
+reprediction.lasso <- glmnet(x, y, alpha=1, lambda=training.cv.lasso$lambda.min)
+reprediction.lasso$beta
+```
+From the above result we can see that not all variables are selected, the majority of the coefficients of Lasso regression are shrinked to zero.
+
+
+Question 3
+
+3.1
+Number of effective sample size = n-p.
+
+3.2
+This model can be considered as a special case of $Y = X\beta + \eta$, since it can be expressed as $$\begin{bmatrix} y_{p+1} \\ y_{p+2} \\ .\\.\\.\\y_{n} \end{bmatrix} = \begin{bmatrix} y_{p}&y_{p-1}&...& y_{1} \\ y_{p+1}&y_{p}&...& y_{2} \\ .&.&.&.\\.&.&.&.\\.&.&.&.\\y_{n-1}&y_{n-2}&...& y_{n-p} \end{bmatrix}*\begin{bmatrix} \phi_{1} \\ \phi_{2} \\ .\\.\\.\\\phi_{p} \end{bmatrix}$$. So we can directly apply the least square estimator $\hat{\phi} = (X^{T}X)^{-1}X^{T}Y$ with $$X = \begin{bmatrix} y_{p}&y_{p-1}&...& y_{1} \\ y_{p+1}&y_{p}&...& y_{2} \\ .&.&.&.\\.&.&.&.\\.&.&.&.\\y_{n-1}&y_{n-2}&...& y_{n-p} \end{bmatrix}, Y = \begin{bmatrix} y_{p+1} \\ y_{p+2} \\ .\\.\\.\\y_{n} \end{bmatrix}$$
+
+3.3
+$\sigma^2_{p} = \frac{RSS^2}{T} = \frac{||Y-\hat{Y}||^2}{T} = \frac{||Y-X\hat{\phi}||^2}{n-p} = \frac{(X\hat{\phi}-Y)^T(X\hat{\phi}-Y)}{n-p} = \frac{Y^TY-Y^TX\hat{\phi}-\hat{\phi}^TX^TY + \hat{\phi}^TX^TX\hat{\phi}}{n-p}$ with X and Y defined above.
+
+3.4 Sample generation:
+```{r}
+set.seed(10)
+
+M1 <- matrix(0, nrow=100, ncol=1)
+for (i in 6:100){
+  M1[i,1] <- 0.434*M1[i-1,1]+0.217*M1[i-2,1]+0.145*M1[i-3,1]+0.108*M1[i-4,1]+0.087*M1[i-5,1]+rnorm(1)
+}
+
+M2 <- matrix(0, nrow=100, ncol=1)
+for (i in 3:100){
+  M2[i,1] <- 0.682*M2[i-1,1]+0.346*M2[i-2,1]+rnorm(1)
+}
+```
+
+3.5
+Construct X and Y for calculating the least square estimator:
+```{r}
+ConstructY <- function(M,p,n) { 
+  # M: a column vector contains the time series data
+  # p: order of time-series model
+  # n: number of data in the series
+  
+  # create Y
+  Y <- matrix(0, nrow = n-p, ncol = 1)
+  for (i in (p+1):n){
+    Y[i-p,1] <- M[i,1]
+  }
+
+  return(Y)
+}
+
+ConstructX <- function(M,p,n) { 
+  # M: a column vector contains the time series data
+  # p: order of time-series model
+  # n: number of data in the series
+  
+  # create X
+  X <- matrix(0, ncol = p, nrow = n-p)
+  for (i in 0:(p-1)){ #col
+    for (j in 1:(n-p)){ #row
+      X[j, p-i] <- M[i+j,1]
+    }
+  }
+  
+  return(X)
+}
+```
+
+Use least square estimator to calculate the coefficient and ICs:
+```{r}
+IC1.M1 <- matrix(0, nrow = 10, ncol = 1)
+IC2.M1 <- matrix(0, nrow = 10, ncol = 1)
+IC3.M1 <- matrix(0, nrow = 10, ncol = 1)
+
+IC1.M2 <- matrix(0, nrow = 10, ncol = 1)
+IC2.M2 <- matrix(0, nrow = 10, ncol = 1)
+IC3.M2 <- matrix(0, nrow = 10, ncol = 1)
+
+for (p in 1:10) {
+  
+  M1.X <- ConstructX(M1,p,100)
+  M1.Y <- ConstructY(M1,p,100)
+  M1.beta <- solve(t(M1.X)%*%M1.X)%*%t(M1.X)%*%M1.Y
+  # M1.fitted <- M1.X%*%M1.beta + matrix(rnorm(100-p), nrow = 100-p, ncol = 1)
+  M1.fitted <- M1.X%*%M1.beta
+  
+  M2.X <- ConstructX(M2,p,100)
+  M2.Y <- ConstructY(M2,p,100)
+  M2.beta <- solve(t(M2.X)%*%M2.X)%*%t(M2.X)%*%M2.Y
+  # M2.fitted <- M1.X%*%M2.beta + matrix(rnorm(100-p), nrow = 100-p, ncol = 1)
+  M2.fitted <- M2.X%*%M2.beta
+  
+  T <- 100-p
+
+  M1.log_sig_sq <- log(sum((M1.fitted - M1[c((p+1):100)])^2)/T)
+  M2.log_sig_sq <- log(sum((M2.fitted - M2[c((p+1):100)])^2)/T)
+
+  IC1.M1[p,1] <- M1.log_sig_sq + 2*(p+1)/T
+  IC2.M1[p,1] <- M1.log_sig_sq + (T+p)/(T-p-2)
+  IC3.M1[p,1] <- M1.log_sig_sq + p*log(T)/T
+
+  IC1.M2[p,1] <- M2.log_sig_sq + 2*(p+1)/T
+  IC2.M2[p,1] <- M2.log_sig_sq + (T+p)/(T-p-2)
+  IC3.M2[p,1] <- M2.log_sig_sq + p*log(T)/T
+}
+```
+```{r}
+IC1.M1 
+```
+```{r}
+IC2.M1 
+```
+```{r}
+IC3.M1 
+```
+
+```{r}
+library(ggplot2)
+p <- c(1:10)
+df <- data.frame(p, IC1.M1, IC2.M1, IC3.M1)
+M1.plot <- ggplot(df, aes(p)) +                    
+  geom_line(aes(y=IC1.M1, colour='IC1')) +
+  geom_line(aes(y=IC2.M1, colour='IC2')) +
+  geom_line(aes(y=IC3.M1, colour='IC3')) +
+  scale_color_manual(name = "ICs", values = c('IC1' = "blue", "IC2" = "red", "IC3" = "black"))
+M1.plot + labs(title = "ICs for M1", y = "IC values") 
+```
+```{r}
+IC1.M2
+```
+```{r}
+IC2.M2
+```
+```{r}
+IC3.M2
+```
+
+```{r}
+library(ggplot2)
+p <- c(1:10)
+df <- data.frame(p, IC1.M2, IC2.M2, IC3.M2)
+M2.plot <- ggplot(df, aes(p)) +
+  geom_line(aes(y=IC1.M2, colour='IC1')) +
+  geom_line(aes(y=IC2.M2, colour='IC2')) +
+  geom_line(aes(y=IC3.M2, colour='IC3')) +
+  scale_color_manual(name = "ICs", values = c('IC1' = "blue", "IC2" = "red", "IC3" = "black"))
+M2.plot + labs(title = "ICs for M2", y = "IC values")
+```
+
+3.6 P count for M1 with sample size = 100:
+```{r}
+p.count <- function(M.sets,n) {
+  
+  # calculate 3 ICs for p = 1,...,10
+  M.IC1.1000 <- matrix(0,nrow = 10, ncol = 1000)
+  M.IC2.1000 <- matrix(0,nrow = 10, ncol = 1000)
+  M.IC3.1000 <- matrix(0,nrow = 10, ncol = 1000)
+  
+  for (i in 1:1000){
+    for (p in 1:10){
+      
+      M <- as.matrix(M.sets[, i], ncol = 1, nrow = n)
+      
+      M.sets.X <- ConstructX(M,p,n)
+      M.sets.Y <- ConstructY(M,p,n)
+      M.sets.beta <- solve(t(M.sets.X)%*%M.sets.X)%*%t(M.sets.X)%*%M.sets.Y
+      M.sets.fitted <- M.sets.X%*%M.sets.beta
+      T <- n-p
+      M.sets.log_sig_sq <- log(sum((M.sets.fitted - M[c((p+1):n)])^2)/T)
+      M.IC1.1000[p,i] <- M.sets.log_sig_sq + 2*(p+1)/T
+      M.IC2.1000[p,i] <- M.sets.log_sig_sq + (T+p)/(T-p-2)
+      M.IC3.1000[p,i] <- M.sets.log_sig_sq + p*log(T)/T
+    }
+  }
+  
+  # Find the optimal order of p for each sample:
+  
+  # C1
+  M.C1.p <- matrix(0, nrow = 1, ncol = 1000)
+  for (i in 1:1000){
+    M.C1.p[1,i] <- which(M.IC1.1000[,i] == min(M.IC1.1000[,i]))
+  }
+  M.C1.p.count <- matrix(0, nrow = 1, ncol = 10)
+  for (i in 1:10){
+    M.C1.p.count[1,i] <- sum(M.C1.p[1,] == i)
+  }
+  
+  # C2
+  M.C2.p <- matrix(0, nrow = 1, ncol = 1000)
+  for (i in 1:1000){
+    M.C2.p[1,i] <- which(M.IC2.1000[,i] == min(M.IC2.1000[,i]))
+  }
+  M.C2.p.count <- matrix(0, nrow = 1, ncol = 10)
+  for (i in 1:10){
+    M.C2.p.count[1,i] <- sum(M.C2.p[1,] == i)
+  }
+  
+  # C3
+  M.C3.p <- matrix(0, nrow = 1, ncol = 1000)
+  for (i in 1:1000){
+    M.C3.p[1,i] <- which(M.IC3.1000[,i] == min(M.IC3.1000[,i]))
+  }
+  M.C3.p.count <- matrix(0, nrow = 1, ncol = 10)
+  for (i in 1:10){
+    M.C3.p.count[1,i] <- sum(M.C3.p[1,] == i)
+  }
+  
+  M.p.count <- t(matrix(c(M.C1.p.count, M.C2.p.count, M.C3.p.count), ncol = 3, nrow = 10))
+  M.p.count <- data.frame(M.p.count, row.names = c("IC1", "IC2", "IC3"))
+  return(`colnames<-`(M.p.count, c(1:10)))
+}
+
+```
+
+```{r}
+#generate samples
+set.seed(10)
+
+M1.sets <- matrix(0, nrow = 100, ncol = 1000)
+
+for (j in 1:1000){ #col
+  for (i in 6:100){ #row
+    M1.sets[i,j] <- 0.434*M1.sets[i-1,j]+0.217*M1.sets[i-2,j]+0.145*M1.sets[i-3,j]+0.108*M1.sets[i-4,j]+0.087*M1.sets[i-5,j]+rnorm(1)
+  }
+}
+```
+
+```{r}
+p.count(M1.sets, 100)
+```
+
+3.7
+P count for M1 with sample size = 15:
+```{r}
+p.count.15 <- function(M.sets,n) {
+  
+  # calculate 3 ICs for p = 1,...,10
+  M.IC1.1000 <- matrix(0,nrow = 10, ncol = 1000)
+  M.IC2.1000 <- matrix(0,nrow = 10, ncol = 1000)
+  M.IC3.1000 <- matrix(0,nrow = 10, ncol = 1000)
+  
+  for (i in 1:1000){
+    for (p in 1:10){
+      
+      M <- as.matrix(M.sets[, i], ncol = 1, nrow = n)
+      
+      M.sets.X <- ConstructX(M,p,n)
+      M.sets.Y <- ConstructY(M,p,n)
+      M.sets.beta <- ginv(t(M.sets.X)%*%M.sets.X)%*%t(M.sets.X)%*%M.sets.Y
+      M.sets.fitted <- M.sets.X%*%M.sets.beta
+      T <- n-p
+      M.sets.log_sig_sq <- log(sum((M.sets.fitted - M[c((p+1):n)])^2)/T)
+      M.IC1.1000[p,i] <- M.sets.log_sig_sq + 2*(p+1)/T
+      M.IC2.1000[p,i] <- M.sets.log_sig_sq + (T+p)/(T-p-2)
+      M.IC3.1000[p,i] <- M.sets.log_sig_sq + p*log(T)/T
+    }
+  }
+  
+  # Find the optimal order of p for each sample:
+  
+  # C1
+  M.C1.p <- matrix(0, nrow = 1, ncol = 1000)
+  for (i in 1:1000){
+    M.C1.p[1,i] <- which(M.IC1.1000[,i] == min(M.IC1.1000[,i]))
+  }
+  M.C1.p.count <- matrix(0, nrow = 1, ncol = 10)
+  for (i in 1:10){
+    M.C1.p.count[1,i] <- sum(M.C1.p[1,] == i)
+  }
+  
+  # C2
+  M.C2.p <- matrix(0, nrow = 1, ncol = 1000)
+  for (i in 1:1000){
+    M.C2.p[1,i] <- which(M.IC2.1000[,i] == min(M.IC2.1000[,i]))
+  }
+  M.C2.p.count <- matrix(0, nrow = 1, ncol = 10)
+  for (i in 1:10){
+    M.C2.p.count[1,i] <- sum(M.C2.p[1,] == i)
+  }
+  
+  # C3
+  M.C3.p <- matrix(0, nrow = 1, ncol = 1000)
+  for (i in 1:1000){
+    M.C3.p[1,i] <- which(M.IC3.1000[,i] == min(M.IC3.1000[,i]))
+  }
+  M.C3.p.count <- matrix(0, nrow = 1, ncol = 10)
+  for (i in 1:10){
+    M.C3.p.count[1,i] <- sum(M.C3.p[1,] == i)
+  }
+  
+  M.p.count <- t(matrix(c(M.C1.p.count, M.C2.p.count, M.C3.p.count), ncol = 3, nrow = 10))
+  M.p.count <- data.frame(M.p.count, row.names = c("IC1", "IC2", "IC3"))
+  return(`colnames<-`(M.p.count, c(1:10)))
+}
+```
+
+```{r}
+#generate samples
+set.seed(10)
+n = 15
+M1.sets <- matrix(0, nrow = n, ncol = 1000)
+
+for (j in 1:1000){ #col
+  for (i in 6:n){ #row
+    M1.sets[i,j] <- 0.434*M1.sets[i-1,j]+0.217*M1.sets[i-2,j]+0.145*M1.sets[i-3,j]+0.108*M1.sets[i-4,j]+0.087*M1.sets[i-5,j]+rnorm(1)
+  }
+}
+```
+```{r}
+p.count.15(M1.sets, n)
+```
+P count for M1 with sample size = 25:
+```{r}
+#generate samples
+set.seed(10)
+n = 25
+M1.sets <- matrix(0, nrow = n, ncol = 1000)
+
+for (j in 1:1000){ #col
+  for (i in 6:n){ #row
+    M1.sets[i,j] <- 0.434*M1.sets[i-1,j]+0.217*M1.sets[i-2,j]+0.145*M1.sets[i-3,j]+0.108*M1.sets[i-4,j]+0.087*M1.sets[i-5,j]+rnorm(1)
+  }
+}
+```
+
+```{r}
+p.count(M1.sets, n)
+```
+
+3.8
+P count for M2 with sample size = 100:
+```{r}
+#generate samples
+set.seed(10)
+n = 100
+M2.sets <- matrix(0, nrow = n, ncol = 1000)
+
+for (j in 1:1000){ #col
+  for (i in 3:n){ #row
+    M2.sets[i,j] <- 0.682*M2.sets[i-1,j]+0.346*M2.sets[i-2,j]+rnorm(1)
+  }
+}
+```
+
+```{r}
+p.count(M2.sets, n)
+```
+P count for M2 with sample size = 15:
+```{r}
+#generate samples
+set.seed(10)
+n = 15
+M2.sets <- matrix(0, nrow = n, ncol = 1000)
+
+for (j in 1:1000){ #col
+  for (i in 3:n){ #row
+    M2.sets[i,j] <- 0.682*M2.sets[i-1,j]+0.346*M2.sets[i-2,j]+rnorm(1)
+  }
+}
+```
+
+```{r}
+p.count.15(M2.sets, n)
+```
+P count for M2 with sample size = 25:
+```{r}
+#generate samples
+set.seed(10)
+n = 25
+M2.sets <- matrix(0, nrow = n, ncol = 1000)
+
+for (j in 1:1000){ #col
+  for (i in 3:n){ #row
+    M2.sets[i,j] <- 0.682*M2.sets[i-1,j]+0.346*M2.sets[i-2,j]+rnorm(1)
+  }
+}
+```
+
+```{r}
+p.count(M2.sets, n)
+```
+
+3.9
+From the above tables, we can see that whatever the order p is of the original model, larger sizes of series of data tend to have larger selected p based on three model selection criteria if the beta can be obtained by using the normal equation. However, for less than full rank model (n=15), the optimal p suggested by three model selection criteria are very large, which may suggest potential overfitting of the model. 
+
+3.10 Derivation see last pages. 
+
+3.11
+```{r}
+prob.threshold <- function(n, p1, p2, p3, L){
+  
+  IC1.thres <- ((n-p1)/L)*exp((2*L*(n+1))/((n-p1-L)*(n-p1)))-(n-p1-L)/L
+  IC2.thres <- ((n-p2)/L)*exp((2*n*L)/((n-2*p2-2)*(n-2*p2-2*L-2)))-(n-p2-L)/L
+  IC3.thres <- ((n-p3)/L)*exp(((p3+L)*log(n-p3-L))/(n-p3-L)-(p3*log(n-p3))/(n-p3))-(n-p3-L)/L
+  
+  return(list(IC1.thres, IC2.thres, IC3.thres))
+}
+```
+```{r}
+overfit.prob <- function(n, p1, p2, p3, L) {
+  
+  prob <- matrix(0, nrow = 3, ncol = length(L))
+  p <- c(p1, p2, p3)
+  
+  for (l in L) {
+    for (i in 1:3){
+      
+      if (i == 1) {
+        thres <- prob.threshold(n, p1, p2, p3, l)[1]
+      }else if (i == 2) {
+        thres <- prob.threshold(n, p1, p2, p3, l)[2]
+      }else {
+        thres <- prob.threshold(n, p1, p2, p3, l)[3]
+      }
+      
+      prob[i,l] <- pf(as.numeric(thres), l, (n-p[i]-l), lower.tail = FALSE)
+    }
+  }
+  
+  prob <- data.frame(prob, row.names = c("IC1", "IC2", "IC3"))
+  return(`colnames<-`(prob, L))
+  
+  return(prob)
+}
+```
+
+```{r}
+overfit.prob(25, 5, 5, 5, c(1:8))
+```
+```{r}
+overfit.prob(100, 5, 5, 5, c(1:8))
+```
+
+3.12
+For the same dataset, as the number of extra parameters increases, the probabilities of overfitting for all three model selection criteria decrease. Compare the probabilities for n = 25 and n = 100, different IC gives different conclusions: IC1 and IC2 indicate that for smaller datasets (n = 25), the probabilities of overfitting will be smaller than larger datasets (n = 100), while IC3 indicates that datasets with n = 25 are more likely to be overfitted than large dataset. An interesting point that needs to be noticed is that the probabilities of overfitting of IC2 for L = 7 & 8 for n = 25 equal to 1, which means that under these conditions the model must be overfitted. 
+
+3.13 Derivation see last pages. 
+```{r}
+n = 100000000000000
+p0 = 5
+l = 1
+pf(1, l, (n-p0-l), lower.tail = FALSE)
+```
+
+
+3.14
+No matter which IC we use, as the number of sample size goes to infinity, the probabilities of overfitting will converge to the same value, with the critical values of F distribution tend to 1. 
+
+
+
+
+

@@ -1,0 +1,141 @@
+---
+title: "Asmt3"
+author: "Kechen Zhao 957398"
+date: "26/05/2021"
+output: word_document
+---
+
+Question 1
+
+a. The command gives a trinomial/multi-categorical logistic model with status as the nominal categorical response variable and year as the predictor. Response variable status with 3 levels follows a multinomial distribution M(371, pi) where pi is a vector that contains the probabilities of getting each category of status. 
+
+By the coefficients given in the summary, the trinomial logit model nominal.mod treats status = normal as base level and is estimated to be:
+$$log(\frac{P(mild)}{P(normal)}) = -4.2917 + 0.0836*year$$
+$$log(\frac{P(severe)}{P(normal)}) = -5.0598 + 0.1093*year$$
+
+b. 0.1093 is the coefficient of year for status = severe. Based on the estimated model written in part a, the odds of a miner's pneu-monoconiosis status is severe will increases by a factor of exp(0.1093) = 1.115497 if one more year had spent working at the coal face. 
+
+The odds ratio of severe status vs normal status for every 10 more years spent working at the coal face is estimated to be:
+$$log(\frac{P(severe)}{P(normal)}) = -5.0598 + 0.1093*year$$
+$$\frac{P(severe)}{P(normal)} = e^{-5.0598 + 0.1093*year}$$
+$$\frac{e^{-5.0598 + 0.1093*10}}{e^{-5.0598 + 0.1093*0}} = e^{0.1093*10} = 2.98321$$
+```{r}
+year = 10
+odds_1b = exp(0.1093*year)
+odds_1b
+```
+The odds ratio of severe status vs normal status for every 10 more years spent working at the coal face is estimated to be 2.98321. 
+
+The standand error of year when status = severe is 0.0165, so the approximate 95% confidence interval is ( 2.158903, 4.122254).
+```{r}
+CI_log_odds = 10*(0.1093 +1.96*c(-1, 1)*0.0165)
+exp(CI_log_odds)
+```
+c. 
+Based on our model, when year = 25, 
+$$log(\frac{P(mild)}{P(normal)}) = -4.2917 + 0.0836*25$$
+$$\frac{P(mild)}{P(normal)} = e^{-4.2917 + 0.0836*25}$$
+$$log(\frac{P(severe)}{P(normal)}) = -5.0598 + 0.1093*25$$
+$$\frac{P(severe)}{P(normal)} = e^{-5.0598 + 0.1093*25}$$
+
+```{r}
+odds_mild = exp(-4.2917 + 0.0836*25)
+odds_severe = exp(-5.0598 + 0.1093*25)
+```
+$$\frac{P(mild)}{P(normal)} + \frac{P(severe)}{P(normal)} = \frac{P(mild)+P(severe)}{P(normal)} = \frac{1-P(normal)}{P(normal)} = e^{-4.2917 + 0.0836*25} + e^{-5.0598 + 0.1093*25}$$
+```{r}
+# odds_mild + odds_severe 
+# = prob_mild/prob_normal + prob_severe/prob_normal 
+# = (prob_mild + prob_severe)/prob_normal
+# = (1-prob_normal)/prob_normal
+prob_normal = 1/(1+(odds_mild+odds_severe))
+prob_mild = odds_mild*prob_normal
+prob_severe = odds_severe*prob_normal
+c(prob_normal, prob_mild, prob_severe)
+prob_normal+prob_mild+prob_severe
+```
+The probability of status = normal is 0.82769552;
+The probability of status = mild is 0.09155550;
+The probability of status = severe is 0.08074898;
+By summing up the above probabilities, we get 1, so the probabilities are valid. 
+
+Question 2
+
+a. The above command gives a cumulative logistic/proportional odds model with status as the ordinal cstegorical response variable and year as the predictor. The cdf of status' distribution is the cdf of a logistic distribution, which is equivalent to 
+$$log(\frac{P(normal)}{P(mild) + P(severe)}) = 3.9558 - 0.0959*year$$
+$$log(\frac{P(normal)+P(mild)}{P(severe)}) = 4.8690 - 0.0959*year$$
+where all the parameter estimates above are given by the model. 
+
+b. The odds of status moving from normal to mild/severe, or from normal/mild to severe level increases by a factor of 1/exp(-0.0959) = exp(0.0959) = 1.100649 as a coal miner spends 1 more year working at the coal face. 
+```{r}
+exp(0.0959)
+```
+The estimated odds ratio of non-normal status vs normal status for every 10 more years spent working at the coal face is:
+$$log(\frac{P(normal)}{P(mild) + P(severe)}) = 3.9558 - 0.0959*year$$
+$$\frac{P(normal)}{P(mild) + P(severe)} = e^{3.9558 - 0.0959*year}$$
+$$\frac{P(mild) + P(severe)}{P(normal)} = \frac{1}{e^{3.9558 - 0.0959*year}}$$
+$$\frac{\frac{1}{e^{3.9558 - 0.0959*10}}}{\frac{1}{e^{3.9558 - 0.0959*0}}} = \frac{e^{3.9558 - 0.0959*0}}{e^{3.9558 - 0.0959*10}} = \frac{1}{e^{-0.0959*10}} = e^{0.0959*10} = 2.609086$$
+The estimated odds ratio of non-normal status vs normal status for every 10 more years spent working at the coal face is 2.609086.
+The standard error for coefficient of year is 0.01194, so the approximate 95% confidence interval is (2.064682, 3.297036).
+```{r}
+log_CI = 10*(0.0959 + c(-1, 1)*1.96*0.01194)
+exp(log_CI)
+```
+c. Based on the derivation before, when year = 25, we have
+$$\frac{P(mild) + P(severe)}{P(normal)} = \frac{1-P(normal)}{P(normal)} = \frac{1}{e^{3.9558 - 0.0959*25}}$$
+```{r}
+1/(1+1/exp(3.9558 - 0.0959*25))
+```
+This gives P(normal) = 0.8261093.
+From another equation, we have 
+$$\frac{P(mild) + P(normal)}{P(severe)} = \frac{1-P(severe)}{P(severe)} = e^{4.8690 - 0.0959*25}$$
+```{r}
+1/(1+exp(4.8690 - 0.0959*25))
+1-0.8261093-0.07788044
+```
+This gives P(severe) = 0.07788044. Then P(mild) = 1-P(normal)-P(severe) = 0.09601026. 
+
+Question 3
+
+a. Response y_it follows a Bernoulli distribution with parameter pi_it where
+$$\pi_{it} = P(y_{it} = 1|age, smoke), t = 1,...,4, i = 1,...,537.$$
+The mean structure of the model is
+$$log(\frac{\hat{\pi_{it}}}{1-\hat{\pi_{it}}}) = -1.880-0.113*age+0.265*smoke$$
+Variance is
+$$\hat{Var(y_{it})} = \hat{\phi}*\pi_{it}*(1-\pi_{it}) = 0.9985*\frac{e^{-1.880-0.113*age+0.265*smoke}}{(1+e^{-1.880-0.113*age+0.265*smoke})^2}$$
+The estimated correlation coefficient is (for t != s)
+$$\hat{Corr}(y_{it},y_{is}) = \hat{\alpha} = 0.3543$$
+
+b. 
+```{r}
+library(faraway)
+data(ohio)
+ohio[ohio$id == 536,]
+```
+The three columns represent intercept, age and smoke respectively. 
+$$\begin{bmatrix} 1 & -2 & 1 \\ 1 & -1 & 1 \\ 1 & 0 & 1 \\ 1 & 1 & 1 \end{bmatrix}$$
+
+c. The estimate of odds ratio of wheezing for a child for every one year older in age is e^(-0.113) = 0.893.
+The approximate standard error of this odds ratio is
+$$s.e.(\hat{odds}) = e^{\hat{\beta}}*s.e.(\hat{\beta}) = e^{-0.113}*0.044 = 0.039$$
+
+d. The log odds ratio of wheezing for a 10-year old child with a smoking mother is
+$$log.odds_{A} = -1.880-0.113*age+0.265*smoke = -1.880-0.113*1+0.265*1$$
+The log odds ratio of wheezing for a 9-year old child with a non-smoking mother is
+$$log.odds_{B} = -1.880-0.113*age+0.265*smoke = -1.880-0.113*0+0.265*0$$
+So the odds ratio of wheezing for a 10-year old child with a smoking mother vs a 9-year old child with a non-smoking mother is
+$$\frac{e^{-1.880-0.113*1+0.265*1}}{e^{-1.880-0.113*0+0.265*0}} = e^{-0.113*1+0.265*1} = 1.164$$
+
+
+
+
+
+
+
+
+
+
+
+
+
+

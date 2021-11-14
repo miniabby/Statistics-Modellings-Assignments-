@@ -1,0 +1,322 @@
+---
+title: "Asmt2"
+author: "Kechen Zhao 957398"
+date: "03/05/2021"
+output: word_document
+---
+
+Question 1
+```{r}
+x <- c(1.69, 1.72, 1.76, 1.78, 1.81, 1.84, 1.86, 1.88)
+n <- c(59, 60, 62, 56, 63, 59, 62, 60)
+y <- c(6, 13, 18, 28, 52, 53, 61, 60)
+
+# First plot the data
+plot(x, y/n, xlab="Dosage", ylab="Proportion killed")
+```
+1a.
+```{r}
+# 1a
+# Compute empirical logits
+empLogit <- log((y+0.5)/(n-y+0.5))
+plot(x, empLogit, xlab="Dosage", ylab="Empirical logits")
+```
+There is a linear trend showed in the plot, but not so linear. 
+
+1b
+```{r}
+# 1b
+# Fit model to get coefficients
+model1 <- glm(y/n~x, family = binomial, weights = n)
+summary(model1)
+# Check overdispersion
+phiHat <- sum(residuals(model1, type="pearson")^2)/(8-2)
+phiHat
+```
+Phi hat = 2.018881 which is greater than 1, which indicates that it may be over-dispersion. So the following quasi-binomial model will be fitted:
+```{r}
+model1b <- glm(y/n~x, family = binomial, weights = n)
+summary(model1b)
+```
+The estmates of intercept = -60.10328 and slope = 33.93416.
+
+1c
+```{r}
+betaHat = summary(model1b)$coef[2]
+stdError = summary(model1b)$coef[,2][2]
+left = betaHat-1.96*stdError
+right = betaHat+1.96*stdError
+CI = c(left, right)
+CI
+```
+The approximate 95% CI for the slope of the logistic regression model is (25.84991, 42.01842). 
+
+1d
+summary(model1b)$coef[1]+summary(model1b)$coef[2]*dosage = 0
+dosage = 1.77117
+
+1e
+```{r}
+# The requested odds ratio estimate equals e^(0.1*betaHat)
+odds_ratio = exp(0.1*betaHat)
+odds_ratio
+```
+The estimate of the odds of being killed increase for a 0.1 increase in dosage is 29.76748.
+```{r}
+# approx. 95% CI for log-odds-ratio is 0.1*(betaHat +- 1.96*std)
+left = 0.1*(betaHat-1.96*stdError)
+right = 0.1*(betaHat+1.96*stdError)
+CI = c(left, right)
+# 95% CI for the referred odds ratio is
+e_left = exp(left)
+e_right = exp(right)
+e_CI = c(e_left, e_right)
+e_CI
+```
+The approximate 95% CI for the factor by which the odds of being killed increase for a 0.1 increase in dosage is (13.26317, 66.80927 ).
+
+1f
+```{r}
+eta = summary(model1b)$coef[1] + 1.8*betaHat
+prob = exp(eta)/(exp(eta)+1)
+prob
+```
+The estimate of the probability that a dosage of 1.8 is fatal is 0.7267543. 
+```{r}
+figure = matrix(c(1, 1.8), nrow = 1, ncol = 2)
+sd = sqrt(figure%*%summary(model1b)$cov.scaled%*%t(figure))
+eta_l = eta-1.96*sd
+eta_r = eta+1.96*sd
+CI_eta = c(eta_l, eta_r)
+prob_l = exp(eta_l)/(exp(eta_l)+1)
+prob_r = exp(eta_r)/(exp(eta_r)+1)
+prob_CI = c(prob_l, prob_r)
+prob_CI
+```
+The approximate 95% CI for the probability that a dosage of 1.8 is fatal is (0.6401387, 0.7990662).
+
+1g
+```{r}
+# Residual deviance
+1 - pchisq(deviance(model1b), df.residual(model1b))
+# 0.03401062 < 0.05, reject H0, model is inadequate, significant amount of information is lost
+```
+The test statistic for residual deviance is 0.03401062 < 0.05, so we reject the null hypothesis that model1b is adequate. 
+```{r}
+#Pearson Chi-square test
+1 - pchisq(sum(resid(model1b, type="pearson")^2), df.residual(model1b))
+# 0.05948877 > 0.05, model is adequate
+```
+The test statistic for Pearson Chi-square test is 0.05948877 > 0.05, so we don't reject the null hypothesis that model1b is adequate. 
+
+1h
+```{r}
+res = resid(model1b, type="deviance")
+plot(x, res, xlab="Dosage", ylab="Deviance residual")
+```
+We can see that there is no obvious pattern in the plot, and all deviance residuals are within the range [-2,2]. 
+
+1i
+```{r}
+quadraticModel <- glm(y/n~x+I(x^2), family = quasibinomial, weights = n)
+anova(quadraticModel, test = "Chi")
+# quadratic term is significant
+# use LRT to do model selection
+anova(model1b, quadraticModel, test = "LRT")
+# p-value = 0.003455 < 0.05, significant, reject model1b, quadratic model is a better fit
+```
+From anova analysis, we can see that p-value for the quadratic term is 0.003455 < 0.05, which indicates that the quadratic term is significant in the model. Also, by using Likelihood Ratio Test, we can see that p-value = 0.003455 < 0.05, which leads to the conclusion that the quadratic model is a better fit to the data. 
+
+
+Question 2
+```{r}
+edu <- rep(6:17,2)
+# encode male as 1 and female as 0
+gender <- c(rep(1, 12), rep(0, 12))
+agree <- c(25, 27, 75, 29, 32, 36, 115, 31, 28, 9, 15, 3, 17, 26, 91, 30, 55, 50, 190, 17, 18, 7, 13, 3)
+disagree <- c(9, 15, 49, 29, 45, 59, 245, 70, 79, 23, 110, 29, 5, 16, 36, 35, 67, 62, 403, 92, 81, 34, 115, 28)
+total <- agree+disagree
+print(cbind(edu, gender, agree, disagree, total))
+```
+2a
+```{r}
+edu.f <- factor(edu)
+gender.f <- factor(gender)
+model2a <- glm(agree/total~edu.f + gender.f, family = binomial, weights = total)
+# Check overdispersion
+phiHat <- sum(residuals(model2a, type="pearson")^2)/(24-13)
+phiHat
+```
+Phi hat = 1.370592, which is not significantly larger than 1, so we can continuous to use binomial regression model.
+```{r}
+summary(model2a)
+anova(model2a, test="Chi")
+```
+By fitting the model which treat edu and gender as factors and add them together, wald test in model summary and also the Chi square test give us the result that if edu.f has already been included in the model, gender.f is not significant. To confirm this result, I will reverse the order of addition and test the model again.
+```{r}
+model2aa <- glm(agree/total~gender.f + edu.f, family = binomial, weights = total)
+summary(model2aa)
+anova(model2aa, test="Chi")
+```
+Reversing the order of edu and gender gives the same result, so their effects are not strictly addictive. 
+
+2b
+To use the ordinal nature of years of education, 
+```{r}
+model1 <- glm(agree/total~edu*gender.f, family = binomial, weights = total)
+anova(model1, test="Chi")
+```
+We can see gender is not significant, but their interaction seems to be significant.
+I will drop gender and fit the model again.
+```{r}
+model2 <- glm(agree/total~edu+edu:gender.f, family = binomial, weights = total)
+anova(model2, test="Chi")
+summary(model2)
+```
+Both Chi-square test and wald test gave the result that edu:gender.f is not significant.
+Test whether adding edu as factors will give any improvements:
+```{r}
+anova(glm(agree/total~edu+edu.f, family = binomial, weights = total), test="Chi")
+```
+There is no improvement by adding edu as factors. 
+So we will only include edu as predictor:
+```{r}
+model_edu <- glm(agree/total~edu, family = binomial, weights = total)
+summary(model_edu)
+odds = exp(-0.30297)
+odds
+```
+The estimated odd ratio of people agrees with the statement against who is also agreed but with one unit lower education is exp(-0.30297) = 0.7386213. It means that the odds of agreeing with the statement decreases by 26.14% if a person receive one unit higher education. 
+
+2c
+Part a and part b both illustrates that edu is the only significant term in the model, the only issue is whether to factor it or not. I will use Chi-square test to test the model adequacy under these two situations: 
+```{r}
+model_edu <- glm(agree/total~edu, family = binomial, weights = total)
+1 - pchisq(summary(model_edu)$deviance, df.residual(model_edu))
+```
+
+```{r}
+model_eduf <- glm(agree/total~edu.f, family = binomial, weights = total)
+1 - pchisq(summary(model_eduf)$deviance, df.residual(model_eduf))
+```
+Both models are adequate under Chi-square test, so both models are appropriate for these data.
+Now analysis the deviance matrix of model with edu as factors:
+```{r}
+matrix(resid(model_edu, type="deviance"), nrow = 24, ncol = 1)
+```
+From the above matrix, we can see that most of the deviance are within the range [-2,2], except for data in 15th and 20th row. Their effect will be analyzed below:
+```{r}
+group <- c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0)
+model_group <- glm(agree/total~group, family = binomial, weights = total)
+anova(model_group, test="Chi")
+```
+This result indicates that group is highly significant. 
+```{r}
+model_edu_group <- glm(agree/total~edu+group, family = binomial, weights = total)
+anova(model_edu, model_edu_group, test="LRT")
+```
+By performing Likelihood Ratio test for nested models, we can see that model includes only edu is adequate enough for the data. 
+The analyze the deviance matrix of model that contains edu as factors:
+```{r}
+matrix(resid(model_eduf, type="deviance"), nrow = 24, ncol = 1)
+```
+We can see that all deviances are within the range of [-2, 2]. So there are no influence points under this model. 
+Therefore, both models with edu as a variable or as factors are appropriate for the data. 
+
+
+Question 3
+```{r}
+freq <- c(19, 132, 0, 9, 11, 52, 6, 97)
+# 1 as yes and 2 as no
+penalty <- factor(rep(1:2,4))
+# 1 as white and 2 as black
+race_defendant <- factor(rep(1:2,each=4))
+race_victim <-factor(rep(rep(1:2,each=2),2))
+print(cbind(race_defendant, race_victim, penalty, freq))
+```
+3a
+```{r}
+# i
+mod1 <- glm(freq~race_defendant + race_victim + penalty, family=poisson)
+1 - pchisq(summary(mod1)$deviance, df.residual(mod1))
+```
+By doing the Chi-square test on residual deviance of the fitted model, p-value is approximately equal to 0 < 0.05, which indicates that model is not a good fit, consequently all three factors are not mutually independent. 
+```{r}
+# ii
+mod2 <- glm(freq~penalty + race_defendant*race_victim, family=poisson)
+1 - pchisq(summary(mod2)$deviance, df.residual(mod2))
+```
+By doing the Chi-square test on residual deviance of the fitted model, p-value is equal to 0.04336859 < 0.05, which indicates that model is not a good fit, consequently sentence is not independent of both the defendant's and the victim's race. 
+```{r}
+# iii
+mod3 <- glm(freq~race_defendant*penalty + race_defendant*race_victim, family=poisson)
+1 - pchisq(summary(mod3)$deviance, df.residual(mod3))
+```
+By doing the Chi-square test on residual deviance of the fitted model, p-value is equal to 0.01915713 < 0.05, which indicates that model is not a good fit, consequently that given the defendant's race, sentence is not independent of the victim's race. 
+```{r}
+# iv
+mod4 <- glm(freq~race_victim*penalty + race_defendant*race_victim, family=poisson)
+1 - pchisq(summary(mod4)$deviance, df.residual(mod4))
+```
+By doing the Chi-square test on residual deviance of the fitted model, p-value is equal to 0.3902578 > 0.05, which indicates that model is a good fit, consequently that given the victim's race, sentence is independent of the victim's race. 
+
+3b
+```{r}
+#1 as yes and 0 as no
+penalty.b <- c(19,0,11,6)
+total <- c(151,9,63,103)
+# 1 as white and 2 as black
+race_d <- factor(c(1,1,2,2))
+race_v <- factor(c(1,2,1,2))
+data.b = data.frame(cbind(race_d, race_v, penalty.b, total))
+print(cbind(race_d, race_v, penalty.b, total))
+```
+```{r}
+# i
+logmodi <- glm(penalty.b/total~1, family=binomial, weights=total)
+summary(logmodi)
+1 - pchisq(summary(logmodi)$deviance, df.residual(logmodi))
+```
+By fitting the null model and based on Chi-square test, p-value = 0.04336859 < 0.05 indicates that model is not adequate, so there is a trend between sentence, defendant's race and victim's race. Hypothesis 1 does not hold. 
+```{r}
+# ii
+logmodii <- glm(penalty.b/total~race_d, family=binomial, weights=total)
+summary(logmodii)
+anova(logmodii, test="Chi")
+1 - pchisq(summary(logmodii)$deviance, df.residual(logmodii))
+```
+By fitting the additive model and performing Chi-square test, we can see that model is inadequate and not a good fit to the data, so sentence is not independent of both defendant's race and victim's race, hypothesis 2 does not hold. 
+```{r}
+# iii
+# Given defendent's race = white
+logmodiiiw <- glm(penalty.b/total~race_v, family=binomial, weights=total, data=data.b[c(1,2),])
+anova(logmodiiiw, test="Chi")
+# Given defendent's race = black
+logmodiiib <- glm(penalty.b/total~race_v, family=binomial, weights=total, data=data.b[c(3,4),])
+anova(logmodiiib, test="Chi")
+```
+By fitting two models that only include the data with defendent's race = white and defendent's race = black, we can see that by performing Chi-square test, given defendent's race = black, victim's race is significant when predicting sentence. So given the defendent's race, sentence is not independent of the victim's race. Hypothesis 3 does not hold. 
+```{r}
+# iv
+# Given victim's race = white
+logmodivw <- glm(penalty.b/total~race_d, family=binomial, weights=total, data=data.b[c(1,3),])
+anova(logmodivw, test="Chi")
+# Given victim's race = black
+logmodivb <- glm(penalty.b/total~race_d, family=binomial, weights=total, data=data.b[c(2,4),])
+anova(logmodivb, test="Chi")
+```
+By fitting two models that only include the data with victim's race = white and victim's race = black, we can see that by performing Chi-square test, race_d is not significant in both models. So given the victim's race, sentence is independent of the defendent's race. Hypothesis 4 holds. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

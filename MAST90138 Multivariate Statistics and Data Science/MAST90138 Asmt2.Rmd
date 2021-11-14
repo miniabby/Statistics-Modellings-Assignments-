@@ -1,0 +1,179 @@
+---
+title: "MAST90138 Asmt2"
+author: "Kechen Zhao 957398"
+date: "30/08/2021"
+output: word_document
+---
+
+Question 1
+a. 
+```{r}
+wheat_data <- read.table("Wheat data.txt", sep = "")
+wheat_variety <- wheat_data[, c(8)]
+X <- as.matrix(wheat_data[, c(1,2,3,4,5,6,7)])
+PCX <- prcomp(X, retx=T)
+lambda <- PCX$sdev^2
+gamma <- PCX$rotation
+```
+Percentage of the variability of the data that each principle component explain:
+```{r}
+fracvar = lambda/sum(lambda)
+fracvar
+```
+The first PC explains 82.94% of the variability and the second PC explains 16.36% of the variability that all seven components explain together. The rest of the PCs only explain very small amount of the variability of the data, with the 3rd explains 0.565%, 4th explains 0.099%, 5th explains 0.021%, 6th explains 0.012% and 7th explains 0.00028% of the variability of the data. 
+
+Compute the cumulative percentages of the variance:
+```{r}
+cumsum(lambda)/sum(lambda)
+screeplot(PCX, type='lines')
+```
+According to the screeplot, elbow occurs when number of PC = 3, and there is no significant amount of variance captured after the 3rd principle components, so we should only kept the first 3 principle components since almost 100% of variance has been represented. 
+
+b. To find the weights of the original data in the principle components, we look at the eigenvectors:
+```{r}
+gamma
+```
+Since we did PCA on the original dataset, intercepts should be calculated and included in the PC expressions：
+```{r}
+colMeans(X)
+```
+Based on the eigenvectors, $$PC1 = -0.884228505*(V_1-14.8475238) -0.395405417*(V_2-14.5592857) -0.004311324*(V_3-0.8709986) -0.128544478*(V_4-5.6285333) -0.111059139*(V_5-3.2586048) +0.127615624*(V_6-3.7002010) -0.128966499*(V_7-5.4080714)$$, so V1 contribute the most in PC1, which is followed by V2, and the rest of contribution equally distribute among V4, V5, V6 and V7. V3 makes the least contribution in PC1.
+
+$$PC2 = 0.10080577*(V_1-14.8475238) +0.056489625*(V_2-14.5592857) -0.002894744*(V_3-0.8709986) +0.030621731*(V_4-5.6285333) +0.002372293*(V_5-3.2586048) +0.989410476*(V_6-3.7002010) +0.082233392*(V_7-5.4080714)$$, so V6 makes the largest contribution in PC1, which is followed by V1. 
+
+c. To plot the data against the first two PCs, first we compute the PC values based on the data:
+```{r}
+n = nrow(X)
+X <- as.matrix(X)
+PCs <- (X-matrix(rep(1,n), nrow=n)%*%colMeans(X))%*%gamma
+
+plot(PCs[,1],PCs[,2], col=wheat_data$V8, xlab="PC1",ylab="PC2")
+legend(-7,4,unique(wheat_data$V8),col=1:length(wheat_data$V8),pch=1)
+```
+The above graph shows that data points are separated into 3 clusters, which are the groups indicated by V8, with black dots represent group1, red dots represent group2 and green dots represent group3. 
+Based on the plot and legend, we can see that PC1 contributes the most in separating groups. Group 3 (represented by green) is the most concentrated one compared to group 1 and 2, which has high values of PC1. Most of the dots of group 1, 2 and 3 are concentrated on the interval [-2, 2], [-6, -2] and [2, 4] respectively. 
+However, the separation of clusters are not so visible while the colors help to determine the clustering. There is no clear group separation determined by PC2. The only conclusion we can get is that group 1 has smaller value of PC2 compared to the other two clusters. It is reasonable since PC1 should be the one that captures the most variability of data. 
+
+d. Compute the correlation matrix:
+```{r}
+Y <- PCX$x
+# compute the covariance between Xi and Yi
+Cov_XY <- gamma%*%diag(lambda)
+# use the formula for correlation inn Week 4 Slide 7
+Corr <- matrix(0, nrow=7, ncol=7)
+for (j in 1:7){
+  for (k in 1:7){
+    Corr[j,k] <- gamma[j,k]*sqrt(lambda[k])/sqrt(diag(cov(X))[j])
+  }
+}
+Corr
+```
+
+Draw the correlation plot:
+```{r}
+# data frame with arrows coordinates
+arrows <- data.frame(x1 = c(0, 0, 0, 0, 0, 0, 0), 
+                     y1 = c(0, 0, 0, 0, 0, 0, 0),
+                     x2 = Corr[,1], 
+                     y2 = Corr[,2])
+
+# function to create a circle
+circle <- function(center = c(0, 0), npoints = 100) {
+  r  <- 1
+  tt <- seq(0, 2 * pi, length = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[1] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+corcir <- circle(c(0, 0), npoints = 100)
+
+plot(corcir, type = "l", xlab = "PC1", ylab = "PC2",
+     main = "correlations between the Xj's and PC1 and PC2",
+     xlim = c(-2, 2))
+for (i in 1:7) {
+  arrows(arrows[i, 1], arrows[i, 2], arrows[i, 3], arrows[i, 4], angle = 20)
+  text(arrows[i, 3] + sign(arrows[i, 3]) * 0.1, 
+       arrows[i, 4] + sign(arrows[i, 3]) * 0.1,
+       colnames(X)[i])
+}
+```
+Recall that for the first two PC components: $$PC1 = -0.884228505*(V_1-14.8475238) -0.395405417*(V_2-14.5592857) -0.004311324*(V_3-0.8709986) -0.128544478*(V_4-5.6285333) -0.111059139*(V_5-3.2586048) +0.127615624*(V_6-3.7002010) -0.128966499*(V_7-5.4080714)$$,$$PC2 = 0.10080577*(V_1-14.8475238) +0.056489625*(V_2-14.5592857) -0.002894744*(V_3-0.8709986) +0.030621731*(V_4-5.6285333) +0.002372293*(V_5-3.2586048) +0.989410476*(V_6-3.7002010) +0.082233392*(V_7-5.4080714)$$. Generally, all variables except for V3 are close to the periphery, which means that they are strongly correlated with PC1 and PC2. To be more specific, based on the correlation graph, v6, V1 and V2 are the most correlated with and well explained by the first two PCs since they are the cloest to the periphery, V5, V4 and V7 are also very strong correlated with the first two PCs, while V3 are the least correlated one since it's the most far away from the periphery. 
+Based on the coordinates of the arrows, PC1 has the most weights on V1, V2, V5 and V4, they are all strongly correlated with the first PC since they all have very small angles with the axis. Moreover, these four variables are all negative correlated with PC1 since they are have negative sign on their weights. However, they are all positively correlated to each other since they all point to the same direction. 
+PC2 has the most weights on V6, V7 and V3, with V6 has the largest weight and is positively correlated with PC2. V7 also has a positive coefficient while V3 has a negative coefficients, so it's negatively correlated with PC2. The rest variables are less correlated with PC2 since they all have very small angles and far away from the periphery. 
+By taking the squared sum of two coordinates of each variables:
+```{r}
+Corr[,1]^2+Corr[,2]^2
+```
+We can see that V1, V2, V4, V5 and V6 are more correlated with the first two PCs while V3 and V7 are less correlated with PC1 and PC2, which is correspond to the result showed in the correlation graph. 
+
+By analyzing the scatter plot of the first 2 PCs, we can see that group 3 (green) generally has the largest positive values in PC1, which is follow by group 1 (black), while group 2 (red) has the largest negative value in PC1. Then, by plotting the pairs plot of the data, 
+```{r}
+## Pairs plot
+class <- wheat_data$V8
+pairs(X, col = c(1,2,3)[class])
+```
+we can see that for red dots, they have large positive values in almost all 7 variables, then since the majority of the variables are highly negatively correlated with PC1, it's reasonable that group 2 (red) has the largest negative value in PC1. Similar for the green dots, since they have smaller values (but still positive) in almost all variables, their values of PC1 will be larger than other groups. 
+
+Question 2
+a. According to the Example 12.1, we can assume that for the orthogonal factor model with a single factor (k = 1), $$Q = \begin{bmatrix} q_1 \\ q_2 \\ q_3 \end{bmatrix}, \Phi = \begin{bmatrix} \Phi_{11}&0&0 \\ 0&\Phi_{22}&0 \\ 0&0&\Phi_{33} \end{bmatrix}, \Sigma = \begin{bmatrix} \sigma_{11}&\sigma_{12}&\sigma_{13} \\ \sigma_{21}&\sigma_{22}&\sigma_{23} \\ \sigma_{31}&\sigma_{32}&\sigma_{33} \end{bmatrix} = \begin{bmatrix} q_1^2+\Phi_{11}&q_1q_2&&q_1q_3 \\ q_1q_2&q_2^2+\Phi_{22}&q_2q_3 \\ q_1q_3&q_2q_3&q_3^2+\Phi_{33} \end{bmatrix}$$, then we have $$q_1^2 = \frac{\sigma_{12}\sigma_{13}}{\sigma_{23}}; q_2^2 = \frac{\sigma_{12}\sigma_{23}}{\sigma_{13}}; q_3^2 = \frac{\sigma_{13}\sigma_{23}}{\sigma_{12}}$$, so $$q_1 = \sqrt{\frac{0.9*0.7}{0.4}} = 1.2549$$, $$q_2 = \sqrt{\frac{0.9*0.4}{0.7}} = 0.717$$, $$q_3 = \sqrt{\frac{0.7*0.4}{0.9}} = 0.558$$. For Phi, $$\Phi_{11} = \sigma_{11}-q_1^2 = 1 - q_1^2 = -0.575$$, $$\Phi_{22} = \sigma_{22}-q_2^2 = 1 - q_2^2 = 0.486$$, $$\Phi_{33} = \sigma_{33}-q_3^2 = 1 - q_3^2 = 0.689$$.
+$$Q = \begin{bmatrix} q_1 \\ q_2 \\ q_3 \end{bmatrix} = \begin{bmatrix} 1.2549 \\ 0.717 \\ 0.558 \end{bmatrix}$$, $$\Phi = \begin{bmatrix} \Phi_{11}&0&0 \\ 0&\Phi_{22}&0 \\ 0&0&\Phi_{33} \end{bmatrix} = \Phi = \begin{bmatrix} -0.575&0&0 \\ 0&0.486&0 \\ 0&0&0.689 \end{bmatrix}$$
+Check the answers:
+```{r}
+Q <- matrix(c(3*sqrt(70)/20, 3*sqrt(70)/35, sqrt(70)/15), ncol=1, nrow=3)
+Phi <- matrix(c(-23/40,0,0,0,17/35,0,0,0,31/45), ncol=3, nrow=3)
+
+Q%*%t(Q) + Phi
+```
+Since k = 1, the only rotation we can do is G=-1, so another solution for the loding matrix is -Q. 
+We can see although we can solve the model, the first entry of Phi is a negative value, while Phi is a variance matrix which is not suppose to have negative values in its entries. 
+
+b.
+i.
+```{r}
+Harman23.cor
+n = 305
+p = 8
+```
+From slides, we know that to avoid over-parametrization, we general requires $$p(p+1)/2 \geqslant pq + p - q(q-1)/2$$, where p is the number of observed variables in X, and q is the number of factors in the model. In this case, p = 8, apply this inequality:
+$$8(8+1)/2 \geqslant 8q + 8 + q(q-1)/2$$ $$36 \geqslant 8q + 8 - q(q-1)/2$$ $$28 \geqslant 8q - q(q-1)/2$$ $$56 \geqslant 17q - q^2$$ $$q^2 - 17q + 56 \geqslant 0$$ $$ q	\leqslant 4.467, q \geqslant 12.5$$ So the maximum number of factors we can fit is 4.
+
+ii.
+```{r}
+factanal(factors = 1, covmat = Harman23.cor)
+```
+
+```{r}
+factanal(factors = 2, covmat = Harman23.cor)
+```
+
+```{r}
+factanal(factors = 3, covmat = Harman23.cor)
+```
+
+```{r}
+factanal(factors = 4, covmat = Harman23.cor)
+```
+We will reject the model if the p-value of LR statistic is smaller than 0.05. In these 4 models, only the model with 4 factors has a p-value = 0.0988 > 0.05, so it suggests that the model with 4 factors is the best fit. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
